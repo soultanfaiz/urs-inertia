@@ -25,7 +25,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 
     // Rute untuk Permohonan (AppRequest)
-    Route::get('/app-requests/{appRequest}/download', [AppRequestController::class, 'download'])->name('app-requests.download');
+    Route::get('/app-requests/{appRequest}/download', [AppRequestController::class, 'download'])->name('app-requests.download'); // Perbaikan: Menambahkan nama rute
     Route::post('/app-requests/{appRequest}/verify', [AppRequestController::class, 'verify'])->name('app-requests.verify');
     // ... (Tambahkan rute custom lain di sini jika ada)
 

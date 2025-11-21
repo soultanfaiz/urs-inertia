@@ -116,9 +116,9 @@ const getStatus = (request) => {
 
                                     <!-- Tombol Aksi -->
                                     <div class="flex items-center space-x-1">
-                                        <a :href="route('app-requests.download', request.id)" @click.stop target="_blank" class="p-2 text-gray-400 rounded-full hover:text-blue-600" title="Unduh PDF">
+                                        <Link :href="route('app-requests.download', request.id)" @click.stop as="a" target="_blank" class="p-2 text-gray-400 rounded-full hover:text-blue-600" title="Unduh PDF">
                                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
-                                        </a>
+                                        </Link>
                                         <!-- Edit/Delete buttons are only for admin for now -->
                                         <template v-if="user.roles && user.roles.includes('admin')">
                                              <Link :href="route('app-requests.edit', request.id)" @click.stop class="p-2 text-gray-400 rounded-full hover:text-blue-600" title="Edit">
@@ -151,4 +151,3 @@ const getStatus = (request) => {
         </div>
     </AuthenticatedLayout>
 </template>
-

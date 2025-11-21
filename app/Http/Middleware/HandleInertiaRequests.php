@@ -2,6 +2,8 @@
 
 namespace App\Http\Middleware;
 
+use App\Enums\RequestStatus;
+use App\Enums\VerificationStatus;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -29,11 +31,20 @@ class HandleInertiaRequests extends Middleware
      */
     public function share(Request $request): array
     {
-        return [
-            ...parent::share($request),
-            'auth' => [
-                'user' => $request->user(),
+        return array_merge(parent::share($request), [
+            'auth' => function () use ($request) {
+                return [
+                    'user' => $request->user() ? $request->user()->load('roles:name') : null,
+                ];
+            },
+            'enums' => [
+                'verificationStatus' => collect(VerificationStatus::cases())->mapWithKeys(function ($case) {
+                    return [$case->name => $case->value];
+                })->all(),
+                'requestStatus' => collect(RequestStatus::cases())->mapWithKeys(function ($case) {
+                    return [$case->name => $case->value];
+                })->all(),
             ],
-        ];
+        ]);
     }
 }
