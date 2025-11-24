@@ -18,11 +18,17 @@ class RequestHistory extends Model
         'user_id',
         'status',
         'reason',
+        'type',
     ];
 
     protected $casts = [
         // Kita tidak bisa langsung cast ke satu Enum karena bisa berisi nilai dari dua Enum yang berbeda.
         // 'status' => RequestStatus::class,
+    ];
+
+    protected $appends = [
+        'status_label',
+        'status_enum',
     ];
 
     /**
@@ -39,6 +45,14 @@ class RequestHistory extends Model
         // Jika gagal, coba buat dari VerificationStatus
         // Kita asumsikan jika bukan RequestStatus, pasti VerificationStatus
         return VerificationStatus::from($this->status);
+    }
+
+    /**
+     * Accessor untuk mendapatkan label status yang bisa dibaca manusia.
+     */
+    public function getStatusLabelAttribute(): string
+    {
+        return $this->getStatusEnumAttribute()->label();
     }
 
     /**

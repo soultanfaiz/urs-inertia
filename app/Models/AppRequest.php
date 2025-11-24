@@ -57,7 +57,7 @@ class AppRequest extends Model
      */
     public function histories(): HasMany
     {
-        return $this->hasMany(RequestHistory::class)->latest();
+        return $this->hasMany(RequestHistory::class)->orderBy('created_at', 'desc')->orderBy('id', 'desc');
     }
 
     /**

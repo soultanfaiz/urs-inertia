@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed, watch } from 'vue';
 import { usePage, useForm } from '@inertiajs/vue3';
-import { format, parseISO, isPast, differenceInDays, formatDistanceToNow } from 'date-fns';
+import { format, parseISO, isPast, differenceInDays, formatDistanceToNow } from 'date-fns'; // Corrected import
 import { id as idLocale } from 'date-fns/locale';
 
 const props = defineProps({
@@ -9,47 +9,47 @@ const props = defineProps({
         type: Object,
         required: true,
     },
-    requestStatusEnum: {
-        type: Object,
-        required: true,
-    }
 });
 
 const user = computed(() => usePage().props.auth.user);
-const isAdmin = computed(() => user.value.roles && user.value.roles.includes('admin'));
+const isAdmin = computed(() => user.value?.roles?.some(role => role.name === 'admin'));
+const enums = computed(() => usePage().props.enums);
+
+const shouldShowCard = computed(() => {
+    const status = props.appRequest.status;
+    const requestStatusEnum = enums.value.requestStatus;
+    return status !== requestStatusEnum.PERMOHONAN && status !== requestStatusEnum.URS;
+});
 
 // --- Local State ---
 const activities = ref([]);
 const isEditingAll = ref(false);
+const showNewActivityForm = ref(false);
 
 // --- Drag & Drop State ---
 const dragIndex = ref(null);
 
 // --- Forms ---
-const addActivityForm = useForm({
+const newActivityForm = useForm({
     description: '',
     sub_activities: [''],
     end_date: '',
 });
 
-const editActivityForm = useForm({
-    id: null,
-    description: '',
-    end_date: '',
-});
+const editForms = ref({}); // Holds a form for each activity being edited
+const newSubActivityForms = ref({}); // Holds a form for each activity's new sub-activity
 
-const addSubActivityForm = useForm({
-    development_activity_id: null,
-    name: '',
-});
-
-// --- Helper Functions (migrated from Blade PHP/JS) ---
+// --- Helper Functions ---
 const getDeadlineInfo = (activity) => {
     if (!activity.end_date) return null;
 
     const deadline = parseISO(activity.end_date);
     const isOverdue = isPast(deadline) && !activity.is_completed;
-    const isNear = !isOverdue && differenceInDays(deadline, new Date()) <= 7;
+
+    // Check if the difference is less than or equal to 7 days but not in the past
+    const now = new Date();
+    const diffDays = differenceInDays(deadline, now);
+    const isNear = !isOverdue && diffDays >= 0 && diffDays <= 7;
 
     const textColor = computed(() => {
         if (isOverdue) return 'text-red-600';
@@ -74,40 +74,42 @@ const getDeadlineInfo = (activity) => {
 
 // Initialize and watch for prop changes
 watch(() => props.appRequest.development_activities, (newActivities) => {
-    activities.value = (newActivities || []).map(activity => ({
-        ...activity,
-        open: activity.sub_activities?.some(s => !s.is_completed) ?? false,
-        showAddSubForm: false, // For inline adding sub-activities
-    })).sort((a, b) => a.iteration_count - b.iteration_count);
+    activities.value = (newActivities || [])
+        .map(activity => ({
+            ...activity,
+            open: activity.sub_activities?.some(s => !s.is_completed) ?? false,
+        }))
+        .sort((a, b) => a.iteration_count - b.iteration_count);
 }, { immediate: true, deep: true });
 
 
 const toggleEditMode = () => {
     isEditingAll.value = !isEditingAll.value;
-    // If we exit edit mode, close any open edit forms
+    // If we exit edit mode, clear all edit forms
     if (!isEditingAll.value) {
-        editActivityForm.reset();
-        editActivityForm.clearErrors();
+        editForms.value = {};
     }
 };
 
 const startEdit = (activity) => {
-    editActivityForm.id = activity.id;
-    editActivityForm.description = activity.description;
-    editActivityForm.end_date = activity.end_date ? format(parseISO(activity.end_date), 'yyyy-MM-dd') : '';
+    editForms.value[activity.id] = useForm({
+        description: activity.description,
+        end_date: activity.end_date ? format(parseISO(activity.end_date), 'yyyy-MM-dd') : '',
+    });
 };
 
-const cancelEdit = () => {
-    editActivityForm.reset();
+const cancelEdit = (activityId) => {
+    delete editForms.value[activityId];
 };
 
 const saveEdit = (activityId) => {
-    editActivityForm.patch(route('development-activity.update', activityId), {
-        preserveScroll: true,
-        onSuccess: () => {
-            editActivityForm.reset();
-        },
-    });
+    const form = editForms.value[activityId];
+    if (form) {
+        form.patch(route('development-activity.update', activityId), {
+            preserveScroll: true,
+            onSuccess: () => cancelEdit(activityId),
+        });
+    }
 };
 
 const deleteActivity = (activityId) => {
@@ -118,61 +120,68 @@ const deleteActivity = (activityId) => {
     }
 };
 
-const toggleSubActivity = (subActivityId, isCompleted) => {
-    useForm({ is_completed: isCompleted }).patch(route('sub-activity.toggle-status', subActivityId), {
+const toggleSubActivity = (subActivityId, currentStatus) => {
+    useForm({ is_completed: !currentStatus }).patch(route('sub-activity.toggle-status', subActivityId), {
         preserveScroll: true,
     });
 };
 
 const deleteSubActivity = (subActivityId) => {
-     if (confirm('Anda yakin ingin menghapus detail pekerjaan ini?')) {
+    if (confirm('Anda yakin ingin menghapus detail pekerjaan ini?')) {
         useForm({}).delete(route('sub-activity.destroy', subActivityId), {
             preserveScroll: true,
         });
     }
 };
 
-const showSubActivityForm = (activity) => {
-    activity.showAddSubForm = true;
-    addSubActivityForm.development_activity_id = activity.id;
-};
-
-const hideSubActivityForm = (activity) => {
-    activity.showAddSubForm = false;
-    addSubActivityForm.reset();
-};
-
-const saveSubActivity = (activity) => {
-    addSubActivityForm.post(route('sub-activity.store'), {
-        preserveScroll: true,
-        onSuccess: () => {
-            hideSubActivityForm(activity);
-        }
+const startAddSubActivity = (activityId) => {
+    newSubActivityForms.value[activityId] = useForm({
+        development_activity_id: activityId,
+        name: '',
     });
 };
 
-const addSubActivityField = () => {
-    addActivityForm.sub_activities.push('');
+const cancelAddSubActivity = (activityId) => {
+    delete newSubActivityForms.value[activityId];
 };
 
-const removeSubActivityField = (index) => {
-    if (addActivityForm.sub_activities.length > 1) {
-        addActivityForm.sub_activities.splice(index, 1);
+const saveSubActivity = (activityId) => {
+    const form = newSubActivityForms.value[activityId];
+    if (form) {
+        form.post(route('sub-activity.store'), {
+            preserveScroll: true,
+            onSuccess: () => cancelAddSubActivity(activityId),
+        });
     }
 };
 
-const saveActivity = () => {
-    addActivityForm.post(route('app-request.development-activity.store', props.appRequest.id), {
+const addSubActivityField = () => {
+    newActivityForm.sub_activities.push('');
+};
+
+const removeSubActivityField = (index) => {
+    if (newActivityForm.sub_activities.length > 1) {
+        newActivityForm.sub_activities.splice(index, 1);
+    }
+};
+
+const saveNewActivity = () => {
+    newActivityForm.post(route('app-request.development-activity.store', props.appRequest.id), {
         preserveScroll: true,
         onSuccess: () => {
-            addActivityForm.reset();
-            addActivityForm.sub_activities = ['']; // Reset to one empty field
+            newActivityForm.reset();
+            newActivityForm.sub_activities = ['']; // Reset to one empty field
+            showNewActivityForm.value = false; // Hide form on success
         }
     });
 };
 
 // --- Drag and Drop Handlers ---
 const handleDragStart = (event, index) => {
+    if (!isAdmin.value || !isEditingAll.value) {
+        event.preventDefault();
+        return;
+    }
     dragIndex.value = index;
     event.dataTransfer.effectAllowed = 'move';
 };
@@ -182,7 +191,7 @@ const handleDragEnd = () => {
 };
 
 const handleDrop = (event, targetIndex) => {
-    if (dragIndex.value === null || dragIndex.value === targetIndex) {
+    if (dragIndex.value === null || dragIndex.value === targetIndex || !isAdmin.value || !isEditingAll.value) {
         return;
     }
 
@@ -198,16 +207,10 @@ const handleDrop = (event, targetIndex) => {
 };
 
 </script>
-
 <template>
-    <div class="p-6 bg-white rounded-lg shadow">
+    <div v-if="shouldShowCard" class="p-6 bg-white rounded-lg shadow">
         <div class="flex items-center justify-between mb-4">
             <h3 class="text-lg font-semibold text-gray-800">Aktivitas Pengembangan</h3>
-            <div v-if="isAdmin" class="flex items-center gap-2">
-                 <button @click="toggleEditMode" type="button" class="inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-50">
-                    <span>{{ isEditingAll ? 'Selesai Mengedit' : 'Edit Aktivitas' }}</span>
-                </button>
-            </div>
         </div>
 
         <div class="border border-gray-200 rounded-lg overflow-hidden">
@@ -227,12 +230,26 @@ const handleDrop = (event, targetIndex) => {
                     <!-- Activity Item -->
                     <div class="p-4 hover:bg-gray-50">
                         <!-- Edit Form -->
-                        <div v-if="isEditingAll && editActivityForm.id === activity.id">
-                           <!-- Content of edit form here -->
+                        <div v-if="isAdmin && isEditingAll && editForms[activity.id]">
+                            <form @submit.prevent="saveEdit(activity.id)">
+                                <input type="text" v-model="editForms[activity.id].description" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm mb-2" placeholder="Deskripsi aktivitas...">
+                                <div class="mt-2 mb-2">
+                                    <label class="text-xs text-gray-600">Deadline</label>
+                                    <input type="date" v-model="editForms[activity.id].end_date" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                                </div>
+                                <div class="flex items-center gap-2 mt-2">
+                                    <button type="submit" :disabled="editForms[activity.id].processing" class="inline-flex items-center px-3 py-1 text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md">
+                                        {{ editForms[activity.id].processing ? 'Menyimpan...' : 'Simpan' }}
+                                    </button>
+                                    <button type="button" @click="cancelEdit(activity.id)" :disabled="editForms[activity.id].processing" class="inline-flex items-center px-3 py-1 text-xs font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md">
+                                        Batal
+                                    </button>
+                                </div>
+                            </form>
                         </div>
 
                         <!-- Display View -->
-                        <div v-else class="flex items-start justify-between gap-3">
+                        <div v-else class="flex items-start justify-between gap-3" >
                             <!-- Left: Drag Handle & Content -->
                             <div class="flex items-start flex-1 min-w-0 gap-3">
                                 <div v-if="isAdmin && isEditingAll" class="pt-1 text-gray-400">
@@ -245,7 +262,7 @@ const handleDrop = (event, targetIndex) => {
                                         <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium" :class="activity.is_completed ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'">
                                             {{ activity.is_completed ? 'Selesai' : 'Dalam Proses' }}
                                         </span>
-                                        <template v-if="getDeadlineInfo(activity) && (getDeadlineInfo(activity).isOverdue || !activity.is_completed)">
+                                        <template v-if="getDeadlineInfo(activity) && !activity.is_completed">
                                             <div class="text-xs flex items-center" :class="getDeadlineInfo(activity).textColor">
                                                 <svg class="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.414-1.415L11 9.586V6z" clip-rule="evenodd"></path></svg>
                                                 <span class="font-medium">Deadline:</span>
@@ -259,7 +276,7 @@ const handleDrop = (event, targetIndex) => {
                             <!-- Right: Actions & Arrow -->
                             <div class="flex items-center gap-2">
                                 <template v-if="isAdmin && isEditingAll">
-                                    <button @click.stop="startEdit(activity)" type="button" class="text-gray-400 hover:text-blue-600" title="Edit aktivitas">
+                                    <button @click.stop="startEdit(activity)" type="button" class="text-gray-400 hover:text-blue-600" title="Edit aktivitas" :disabled="editForms[activity.id]">
                                         <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" /></svg>
                                     </button>
                                     <button @click.stop="deleteActivity(activity.id)" type="button" class="text-gray-400 hover:text-red-600" title="Hapus aktivitas">
@@ -275,27 +292,98 @@ const handleDrop = (event, targetIndex) => {
 
                     <!-- Sub-Activities -->
                     <div v-show="activity.open" class="p-4 bg-gray-50 border-t border-gray-200">
-                        <!-- Sub-activity list -->
+                        <h4 class="text-sm font-medium text-gray-700 mb-3">Detail Pekerjaan:</h4>
+                        <ul v-if="activity.sub_activities?.length > 0" class="space-y-3 pl-5">
+                            <li v-for="subActivity in activity.sub_activities" :key="subActivity.id" class="flex items-center gap-3 group">
+                                <input v-if="isAdmin" type="checkbox" :checked="subActivity.is_completed" @change="toggleSubActivity(subActivity.id, subActivity.is_completed)" class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer">
+                                <span class="text-sm flex-1" :class="{ 'line-through text-gray-500': subActivity.is_completed, 'text-gray-800': !subActivity.is_completed }">
+                                    {{ subActivity.name }}
+                                </span>
+                                <button v-if="isAdmin && isEditingAll" @click="deleteSubActivity(subActivity.id)" type="button" class="ml-auto text-gray-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity" title="Hapus detail pekerjaan">
+                                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.134-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.067-2.09.92-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" /></svg>
+                                </button>
+                            </li>
+                        </ul>
+                        <p v-else class="text-sm text-gray-500 italic">Tidak ada detail pekerjaan untuk aktivitas ini.</p>
+
+                        <!-- Add Sub-Activity Form -->
+                        <div v-if="isAdmin && isEditingAll" class="mt-3 pt-3 border-t border-gray-200">
+                            <form v-if="newSubActivityForms[activity.id]" @submit.prevent="saveSubActivity(activity.id)" class="mb-3 p-3 bg-white border border-gray-200 rounded-md">
+                                <div class="space-y-3">
+                                    <div>
+                                        <label :for="`sub-activity-input-${activity.id}`" class="text-xs font-medium text-gray-700">Detail Pekerjaan Baru</label>
+                                        <input type="text" v-model="newSubActivityForms[activity.id].name" :id="`sub-activity-input-${activity.id}`" @keydown.enter.prevent="saveSubActivity(activity.id)" placeholder="Contoh: Membuat endpoint API" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <button type="submit" :disabled="newSubActivityForms[activity.id].processing" class="inline-flex items-center px-3 py-1.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md">
+                                            {{ newSubActivityForms[activity.id].processing ? 'Menyimpan...' : 'Simpan' }}
+                                        </button>
+                                        <button type="button" @click="cancelAddSubActivity(activity.id)" :disabled="newSubActivityForms[activity.id].processing" class="inline-flex items-center px-3 py-1.5 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md">
+                                            Batal
+                                        </button>
+                                    </div>
+                                </div>
+                            </form>
+                            <button v-else @click="startAddSubActivity(activity.id)" type="button" class="inline-flex items-center px-3 py-2 text-sm font-medium text-blue-600 hover:text-blue-700 bg-white hover:bg-gray-50 border border-blue-200 hover:border-blue-300 rounded-md">
+                                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                                Tambah Detail
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- Add Activity Form -->
-        <div v-if="isAdmin" class="mt-6">
-            <!-- Form content here -->
+        <!-- Action Buttons -->
+        <div v-if="isAdmin" class="mt-6 pt-6 border-t border-gray-200 flex items-center gap-2">
+            <button @click="showNewActivityForm = !showNewActivityForm" type="button" class="inline-flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white" :class="showNewActivityForm ? 'bg-gray-600 hover:bg-gray-700' : 'bg-blue-600 hover:bg-blue-700'">
+                <span>{{ showNewActivityForm ? 'Batal' : '+ Tambah Aktivitas' }}</span>
+            </button>
+            <button @click="toggleEditMode" type="button" class="inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-50">
+                <span>{{ isEditingAll ? 'Selesai Mengedit' : 'Edit Aktivitas' }}</span>
+            </button>
+        </div>
+
+        <!-- Add Activity Form (Collapsible) -->
+        <div v-if="isAdmin && showNewActivityForm" class="mt-4 border border-dashed border-gray-300 rounded-lg p-4">
+            <form @submit.prevent="saveNewActivity">
+                <div class="space-y-4">
+                    <div>
+                        <label for="new_description" class="block text-sm font-medium text-gray-700">Deskripsi Aktivitas Utama Baru</label>
+                        <textarea id="new_description" v-model="newActivityForm.description" class="border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm mt-1 block w-full" placeholder="Contoh: Implementasi Modul Keuangan" required></textarea>
+                    </div>
+                    <div>
+                        <h4 class="text-sm font-medium text-gray-800 mb-2">Detail Pekerjaan</h4>
+                        <div class="space-y-2">
+                            <div v-for="(sub, index) in newActivityForm.sub_activities" :key="index" class="flex items-center space-x-2">
+                                <input type="text" v-model="newActivityForm.sub_activities[index]" @keydown.enter.prevent="addSubActivityField" class="block w-full text-sm border-gray-300 rounded-md shadow-sm" placeholder="Contoh: Membuat endpoint API">
+                                <button type="button" @click="removeSubActivityField(index)" v-show="newActivityForm.sub_activities.length > 1" class="text-red-500 hover:text-red-700" title="Hapus">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                                </button>
+                            </div>
+                        </div>
+                        <button type="button" @click="addSubActivityField" class="mt-3 text-sm text-blue-600 hover:text-blue-800">+ Tambah Detail</button>
+                    </div>
+                    <div>
+                        <label for="new_end_date" class="block text-sm font-medium text-gray-700">Tanggal Selesai (Opsional)</label>
+                        <input type="date" id="new_end_date" v-model="newActivityForm.end_date" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm">
+                    </div>
+                </div>
+                <div class="mt-4 flex items-center justify-end gap-2">
+                     <button type="button" @click="showNewActivityForm = false" class="inline-flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
+                        Batal
+                    </button>
+                    <button type="submit" :disabled="newActivityForm.processing" class="inline-flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50">
+                        {{ newActivityForm.processing ? 'Menyimpan...' : 'Simpan Aktivitas' }}
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 </template>
-
 <style>
 /* Native HTML5 Drag & Drop Styling */
 [draggable="true"] {
     cursor: move;
-}
-
-.dragging {
-    opacity: 0.5;
-    background-color: #eff6ff;
 }
 </style>

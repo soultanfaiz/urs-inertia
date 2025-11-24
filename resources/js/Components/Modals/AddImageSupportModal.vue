@@ -64,7 +64,7 @@ const closeModal = () => {
         <div v-if="history" class="p-6">
             <form @submit.prevent="submit">
                 <h2 class="text-lg font-medium text-gray-900">
-                    Tambahkan Bukti Dukung Gambar
+                    Tambahkan Gambar Pendukung
                 </h2>
                 <p class="mt-1 text-sm text-gray-600">
                     Unggah gambar (JPG, PNG, GIF) sebagai bukti untuk melanjutkan ke tahap selanjutnya.

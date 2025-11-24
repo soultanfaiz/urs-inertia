@@ -20,14 +20,32 @@ const emit = defineEmits([
 const user = computed(() => usePage().props.auth.user);
 const enums = computed(() => usePage().props.enums); // Access enums from page props
 
-const isAdmin = computed(() => user.value.roles && user.value.roles.includes('admin'));
+const isAdmin = computed(() => user.value?.roles?.some(role => role.name === 'admin'));
 const isOwner = computed(() => user.value.id === props.appRequest.user_id);
 
 // --- Computed properties for data processing ---
 
 // Flatten all documents and images from the histories
-const allDocs = computed(() => props.appRequest.histories?.flatMap(h => h.doc_supports) ?? []);
-const allImages = computed(() => props.appRequest.histories?.flatMap(h => h.image_supports) ?? []);
+const allDocs = computed(() => {
+    const verificationStatusEnum = enums.value?.verificationStatus;
+    if (!verificationStatusEnum) return [];
+
+    const docs = props.appRequest.histories?.flatMap(h => h.doc_supports) ?? [];
+    return docs.filter(doc =>
+        doc.verification_status === verificationStatusEnum.MENUNGGU ||
+        doc.verification_status === verificationStatusEnum.DISETUJUI
+    );
+});
+const allImages = computed(() => {
+    const verificationStatusEnum = enums.value?.verificationStatus;
+    if (!verificationStatusEnum) return [];
+
+    const images = props.appRequest.histories?.flatMap(h => h.image_supports) ?? [];
+    return images.filter(image =>
+        image.verification_status === verificationStatusEnum.MENUNGGU ||
+        image.verification_status === verificationStatusEnum.DISETUJUI
+    );
+});
 
 const hasContent = computed(() => allDocs.value.length > 0 || allImages.value.length > 0);
 

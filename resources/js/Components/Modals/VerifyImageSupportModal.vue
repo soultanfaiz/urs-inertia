@@ -109,5 +109,3 @@ const closeModal = () => {
         </form>
     </Modal>
 </template>
-
-

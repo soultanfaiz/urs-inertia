@@ -67,7 +67,7 @@ watch(() => props.show, (newVal) => {
 const submit = () => {
     if (!nextStatus.value) return; // Prevent submission if there's no next status
 
-    form.patch(route('app-request.update-status', props.appRequest.id), {
+    form.patch(route('app-requests.update-status', props.appRequest.id), {
         preserveScroll: true,
         onSuccess: () => closeModal(),
     });

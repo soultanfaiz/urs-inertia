@@ -38,7 +38,7 @@ watch(
 );
 
 const submit = () => {
-    form.post(route('app-request.verify', props.appRequest.id), {
+    form.post(route('app-requests.verify', props.appRequest.id), {
         preserveScroll: true,
         onSuccess: () => {
             closeModal();

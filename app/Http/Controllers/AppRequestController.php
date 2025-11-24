@@ -96,11 +96,14 @@ class AppRequestController extends Controller
 
         $appRequest->load([
             'user',
-            'histories.user', // Muat juga user yang membuat history
-            'histories.docSupports',
-            'histories.imageSupports',
+            'histories' => function ($query) {
+                $query->orderBy('created_at', 'desc')->orderBy('id', 'desc')->with(['user', 'docSupports', 'imageSupports']);
+            },
             'developmentActivities.subActivities'
         ]);
+
+        // Untuk debugging: Cek apakah data aktivitas pengembangan berhasil dimuat.
+        // dd($appRequest->developmentActivities);
 
         // Render komponen Vue 'AppRequest/Show'
         return Inertia::render('AppRequest/Show', [
@@ -108,11 +111,123 @@ class AppRequestController extends Controller
         ]);
     }
 
-    // ... (Metode lain seperti download, verify, updateStatus, dll. tetap sama)
-    // ... karena mereka sudah menggunakan redirect atau response langsung,
+ /**
+     * Memperbarui status permohonan yang sudah diverifikasi (oleh admin).
+     */
+    public function updateStatus(Request $request, AppRequest $appRequest)
+    {
+        // Otorisasi: Hanya admin yang bisa mengubah status.
+        if (!auth()->user()->hasRole('admin')) {
+            abort(403, 'Hanya admin yang dapat mengubah status permohonan.');
+        }
+
+        // Otorisasi: Pastikan permohonan sudah diverifikasi
+        if ($appRequest->verification_status !== VerificationStatus::DISETUJUI) {
+            if ($request->ajax()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Hanya permohonan yang disetujui yang dapat diubah status progresnya.'
+                ], 403);
+            }
+            abort(403, 'Hanya permohonan yang disetujui yang dapat diubah status progresnya.');
+        }
+
+        $validated = $request->validate([
+            'status' => ['required', new Enum(RequestStatus::class)],
+            'end_date' => 'required|date|after_or_equal:today',
+            'reason' => 'nullable|string',
+        ]);
+
+        DB::transaction(function () use ($appRequest, $validated, $request) {
+            $newStatus = RequestStatus::from($validated['status']);
+
+            // Siapkan data untuk diupdate
+            $updateData = [
+                'status' => $newStatus,
+                'end_date' => $validated['end_date'],
+            ];
+
+            $appRequest->update($updateData);
+
+            $appRequest->histories()->create([
+                'user_id' => auth()->id(),
+                // Catat status progres di riwayat
+                'status' => $newStatus,
+                'reason' => $validated['reason'] ?? null,
+            ]);
+        });
+
+        // Inertia akan secara otomatis menangani redirect ini dengan benar pada request XHR (AJAX).
+        // Pesan 'success' akan dikirim sebagai flash message.
+        return redirect()->route('app-requests.show', $appRequest)
+            ->with('success', 'Status permohonan berhasil diubah!');
+    }
     // ... yang kompatibel dengan cara kerja Inertia.
     // ... Pastikan Anda menyalin semua metode lainnya dari controller asli Anda ke sini.
     // ... Saya akan menyalin beberapa metode penting sebagai contoh.
+
+     public function storeDocSupport(Request $request, AppRequest $appRequest, RequestHistory $history)
+    {
+        // Otorisasi: Hanya admin atau pemilik permohonan yang bisa menambahkan dokumen pendukung.
+        if (!auth()->user()->hasRole('admin') && auth()->id() !== $appRequest->user_id) {
+            abort(403, 'Anda tidak diizinkan menambahkan dokumen pendukung untuk permohonan ini.');
+        }
+
+        // Otorisasi sederhana: pastikan history ini milik appRequest yang benar
+        if ($history->app_request_id !== $appRequest->id) {
+            abort(404);
+        }
+
+        $validated = $request->validate([
+            'file_support_pdf' => 'required|file|mimes:pdf|max:2048', // Maks 2MB
+        ]);
+
+        $file = $validated['file_support_pdf'];
+        $path = $file->store('support_docs');
+
+        $history->docSupports()->create([
+            // Simpan status progres dari riwayat terkait
+            'request_status' => $history->status,
+            'file_path' => $path,
+            'file_name' => $file->getClientOriginalName(),
+            'verification_status' => VerificationStatus::MENUNGGU->value,
+        ]);
+
+        return redirect()->route('app-requests.show', $appRequest)->with('success', 'Dokumen pendukung berhasil ditambahkan!');
+    }
+
+    /**
+     * Menyimpan bukti dukung gambar untuk sebuah riwayat proses.
+     */
+    public function storeImageSupport(Request $request, AppRequest $appRequest, RequestHistory $history)
+    {
+        // Otorisasi: Hanya admin atau pemilik permohonan yang bisa menambahkan bukti gambar.
+        if (!auth()->user()->hasRole('admin') && auth()->id() !== $appRequest->user_id) {
+            abort(403, 'Anda tidak diizinkan menambahkan bukti gambar untuk permohonan ini.');
+        }
+
+        // Otorisasi sederhana: pastikan history ini milik appRequest yang benar
+        if ($history->app_request_id !== $appRequest->id) {
+            abort(404);
+        }
+
+        $validated = $request->validate([
+            'file_support_image' => 'required|file|mimes:jpeg,jpg,png,gif|max:5120', // Maks 5MB
+        ]);
+
+        $file = $validated['file_support_image'];
+        $path = $file->store('support_images');
+
+        $history->imageSupports()->create([
+            // Simpan status progres dari riwayat terkait
+            'request_status' => $history->status,
+            'image_path' => $path,
+            'image_name' => $file->getClientOriginalName(),
+            'verification_status' => VerificationStatus::MENUNGGU->value,
+        ]);
+
+        return redirect()->route('app-requests.show', $appRequest)->with('success', 'Bukti dukung gambar berhasil ditambahkan!');
+    }
 
     /**
      * Mengunduh file PDF utama.
@@ -153,6 +268,7 @@ class AppRequestController extends Controller
             $appRequest->histories()->create([
                 'user_id' => auth()->id(),
                 'status' => $verificationStatus->value,
+                'type' => 'verification', // Tambahkan baris ini
                 'reason' => $validated['reason'] ?? null,
             ]);
 
@@ -180,5 +296,105 @@ class AppRequestController extends Controller
         return redirect()->route('app-requests.show', $appRequest)->with('success', 'Status permohonan berhasil diperbarui!');
     }
 
-    // ... (Pastikan semua metode lain ada di sini)
+      /**
+     * Mengunduh file dokumen pendukung.
+     */
+    public function downloadDocSupport(RequestDocSupport $docSupport)
+    {
+        // Otorisasi: Pastikan pengguna adalah pemilik permohonan atau admin.
+        // Kita mengambil AppRequest melalui relasi: DocSupport -> History -> AppRequest
+        $appRequest = $docSupport->requestHistory->appRequest;
+
+        if (auth()->user()->id !== $appRequest->user_id && !auth()->user()->hasRole('admin')) {
+            abort(403, 'Anda tidak diizinkan mengakses file ini.');
+        }
+
+        // Cek apakah file ada di storage
+        if (!Storage::exists($docSupport->file_path)) {
+            abort(404, 'File tidak ditemukan.');
+        }
+
+        // Kirim file sebagai respons unduhan dengan nama file aslinya.
+        // Menggunakan Storage::response() untuk menampilkan preview di browser (inline)
+        // daripada memaksa unduhan (attachment).
+        return Storage::response(
+            $docSupport->file_path,
+            $docSupport->file_name,
+            [
+                'Content-Type' => 'application/pdf',
+                'Content-Disposition' => 'inline; filename="' . $docSupport->file_name . '"'
+            ]
+        );
+    }
+
+    /**
+     * Menampilkan gambar pendukung.
+     */
+    public function viewImageSupport(RequestImageSupport $imageSupport)
+    {
+        // Otorisasi: Pastikan pengguna adalah pemilik permohonan atau admin
+        $appRequest = $imageSupport->requestHistory->appRequest;
+
+        if (auth()->user()->id !== $appRequest->user_id && !auth()->user()->hasRole('admin')) {
+            abort(403, 'Anda tidak diizinkan mengakses gambar ini.');
+        }
+
+        // Cek apakah file ada di storage
+        if (!Storage::exists($imageSupport->image_path)) {
+            abort(404, 'Gambar tidak ditemukan.');
+        }
+
+        // Kirim file sebagai respons untuk ditampilkan di browser
+        return Storage::response($imageSupport->image_path);
+    }
+
+    /**
+     * Memverifikasi dokumen pendukung (oleh admin).
+     */
+    public function verifyDocSupport(Request $request, RequestDocSupport $docSupport)
+    {
+        // Otorisasi: Hanya admin yang bisa melakukan verifikasi.
+        if (!auth()->user()->hasRole('admin')) {
+            abort(403, 'Hanya admin yang dapat melakukan verifikasi.');
+        }
+
+        $validated = $request->validate([
+            'doc_verification_status' => ['required', new Enum(VerificationStatus::class)],
+            'doc_reason' => 'nullable|string|required_if:doc_verification_status,' . VerificationStatus::DITOLAK->value,
+        ]);
+
+        $docSupport->update([
+            'verification_status' => $validated['doc_verification_status'],
+            'reason' => $validated['doc_reason'] ?? null,
+        ]);
+
+        // Redirect kembali ke halaman detail permohonan
+        return redirect()->route('app-requests.show', $docSupport->requestHistory->appRequest)
+            ->with('success', 'Status dokumen pendukung berhasil diperbarui!');
+    }
+
+    /**
+     * Memverifikasi gambar pendukung (oleh admin).
+     */
+    public function verifyImageSupport(Request $request, RequestImageSupport $imageSupport)
+    {
+        // Otorisasi: Hanya admin yang bisa melakukan verifikasi.
+        if (!auth()->user()->hasRole('admin')) {
+            abort(403, 'Hanya admin yang dapat melakukan verifikasi.');
+        }
+
+        $validated = $request->validate([
+            'image_verification_status' => ['required', new Enum(VerificationStatus::class)],
+            'image_reason' => 'nullable|string|required_if:image_verification_status,' . VerificationStatus::DITOLAK->value,
+        ]);
+
+        $imageSupport->update([
+            'verification_status' => $validated['image_verification_status'],
+            'reason' => $validated['image_reason'] ?? null,
+        ]);
+
+        // Redirect kembali ke halaman detail permohonan
+        return redirect()->route('app-requests.show', $imageSupport->requestHistory->appRequest)
+            ->with('success', 'Status gambar pendukung berhasil diperbarui!');
+    }
 }
