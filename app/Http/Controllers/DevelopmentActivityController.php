@@ -31,16 +31,10 @@ class DevelopmentActivityController extends Controller
             // 1. Buat aktivitas utama
             $activityData = [
                 'description' => $validated['description'],
+                                'start_date' => $validated['start_date'] ?? null,
+                'end_date' => $validated['end_date'] ?? null,
                 'iteration_count' => $newIteration,
             ];
-
-            // Tambahkan tanggal jika ada
-            if (!empty($validated['start_date'])) {
-                $activityData['start_date'] = $validated['start_date'];
-            }
-            if (!empty($validated['end_date'])) {
-                $activityData['end_date'] = $validated['end_date'];
-            }
 
             $activity = $appRequest->developmentActivities()->create($activityData);
 
