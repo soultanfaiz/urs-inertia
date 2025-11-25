@@ -1,7 +1,7 @@
 <script setup>
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import Pagination from '@/Components/Pagination.vue'; // Assuming you have a pagination component
-import { Head, Link, usePage } from '@inertiajs/vue3';
+import { Head, Link, usePage, router } from '@inertiajs/vue3';
 import { computed } from 'vue';
 
 const props = defineProps({
@@ -13,6 +13,7 @@ const props = defineProps({
 
 const user = computed(() => usePage().props.auth.user);
 
+const key = computed(() => usePage().url);
 const format_date = (value) => {
     if (value) {
         const date = new Date(value);
@@ -65,7 +66,7 @@ const getStatus = (request) => {
 
 <template>
     <Head title="Permohonan" />
-
+    <div :key="key">
     <AuthenticatedLayout>
         <template #header>
             <h2 class="text-xl font-semibold leading-tight text-gray-800">
@@ -108,14 +109,14 @@ const getStatus = (request) => {
                                 </div>
 
                                 <!-- Status dan Aksi -->
-                                <div class="md:col-span-4 lg:col-span-6 flex flex-wrap items-center justify-start md:justify-end gap-2 md:gap-4">
+                                <div class="md:col-span-4 lg:col-span-6 flex flex-col sm:flex-row sm:flex-wrap items-start sm:items-center justify-start md:justify-end gap-2 md:gap-4 mt-2 md:mt-0">
                                     <!-- Badge Status -->
-                                    <span class="order-first inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium" :class="getStatus(request).class">
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium" :class="getStatus(request).class">
                                         {{ getStatus(request).text }}
                                     </span>
 
                                     <!-- Tombol Aksi -->
-                                    <div class="flex items-center space-x-1">
+                                    <div class="flex items-center space-x-1 mt-2 sm:mt-0">
                                         <Link :href="route('app-requests.download', request.id)" @click.stop as="a" target="_blank" class="p-2 text-gray-400 rounded-full hover:text-blue-600" title="Unduh PDF">
                                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
                                         </Link>
@@ -150,4 +151,5 @@ const getStatus = (request) => {
             </div>
         </div>
     </AuthenticatedLayout>
+    </div>
 </template>

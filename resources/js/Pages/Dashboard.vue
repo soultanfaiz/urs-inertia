@@ -5,10 +5,13 @@ import { onMounted, ref } from 'vue';
 import {
     Chart,
     ArcElement,
+    BarController,
     BarElement,
     CategoryScale,
     LinearScale,
+    LineController,
     LineElement,
+    PieController,
     PointElement,
     Tooltip,
     Legend,
@@ -17,10 +20,13 @@ import {
 
 Chart.register(
     ArcElement,
+    BarController,
     BarElement,
     CategoryScale,
     LinearScale,
+    LineController,
     LineElement,
+    PieController,
     PointElement,
     Tooltip,
     Legend,

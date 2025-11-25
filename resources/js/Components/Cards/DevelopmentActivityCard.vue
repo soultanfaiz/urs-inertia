@@ -208,7 +208,7 @@ const handleDrop = (event, targetIndex) => {
 
 </script>
 <template>
-    <div v-if="shouldShowCard" class="p-6 bg-white rounded-lg shadow">
+    <div v-if="shouldShowCard" class="p-4 sm:p-6 bg-white rounded-lg shadow">
         <div class="flex items-center justify-between mb-4">
             <h3 class="text-lg font-semibold text-gray-800">Aktivitas Pengembangan</h3>
         </div>
@@ -258,7 +258,7 @@ const handleDrop = (event, targetIndex) => {
                                 <div @click="activity.open = !activity.open" class="flex-1 min-w-0 cursor-pointer">
                                     <p class="text-sm font-medium text-gray-800">{{ activity.description }}</p>
                                     <!-- Status & Deadline -->
-                                    <div class="flex flex-wrap items-center gap-2 mt-1">
+                                    <div class="flex flex-col sm:flex-row sm:flex-wrap items-start sm:items-center gap-x-2 gap-y-1 mt-1">
                                         <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium" :class="activity.is_completed ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'">
                                             {{ activity.is_completed ? 'Selesai' : 'Dalam Proses' }}
                                         </span>
@@ -266,7 +266,7 @@ const handleDrop = (event, targetIndex) => {
                                             <div class="text-xs flex items-center" :class="getDeadlineInfo(activity).textColor">
                                                 <svg class="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.414-1.415L11 9.586V6z" clip-rule="evenodd"></path></svg>
                                                 <span class="font-medium">Deadline:</span>
-                                                <span class="ml-1">{{ getDeadlineInfo(activity).date }}</span>
+                                                <span class="ml-1 truncate">{{ getDeadlineInfo(activity).date }}</span>
                                                 <span class="ml-1">{{ getDeadlineInfo(activity).status }}</span>
                                             </div>
                                         </template>
@@ -335,12 +335,12 @@ const handleDrop = (event, targetIndex) => {
         </div>
 
         <!-- Action Buttons -->
-        <div v-if="isAdmin" class="mt-6 pt-6 border-t border-gray-200 flex items-center gap-2">
+        <div v-if="isAdmin" class="mt-6 pt-6 border-t border-gray-200 flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
             <button @click="showNewActivityForm = !showNewActivityForm" type="button" class="inline-flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white" :class="showNewActivityForm ? 'bg-gray-600 hover:bg-gray-700' : 'bg-blue-600 hover:bg-blue-700'">
-                <span>{{ showNewActivityForm ? 'Batal' : '+ Tambah Aktivitas' }}</span>
+                <span class="truncate">{{ showNewActivityForm ? 'Batal' : '+ Tambah Aktivitas' }}</span>
             </button>
             <button @click="toggleEditMode" type="button" class="inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-50">
-                <span>{{ isEditingAll ? 'Selesai Mengedit' : 'Edit Aktivitas' }}</span>
+                <span class="truncate">{{ isEditingAll ? 'Selesai Mengedit' : 'Edit Aktivitas' }}</span>
             </button>
         </div>
 
@@ -368,14 +368,14 @@ const handleDrop = (event, targetIndex) => {
                         <label for="new_end_date" class="block text-sm font-medium text-gray-700">Tanggal Selesai (Opsional)</label>
                         <input type="date" id="new_end_date" v-model="newActivityForm.end_date" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm">
                     </div>
-                </div>
-                <div class="mt-4 flex items-center justify-end gap-2">
+                    <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-2">
                      <button type="button" @click="showNewActivityForm = false" class="inline-flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
                         Batal
                     </button>
                     <button type="submit" :disabled="newActivityForm.processing" class="inline-flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50">
                         {{ newActivityForm.processing ? 'Menyimpan...' : 'Simpan Aktivitas' }}
                     </button>
+                </div>
                 </div>
             </form>
         </div>

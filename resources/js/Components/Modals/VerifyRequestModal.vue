@@ -98,7 +98,7 @@ const closeModal = () => {
                     Batal
                 </SecondaryButton>
 
-                <PrimaryButton class="ms-3" :class="{ 'opacity-25': form.processing }" :disabled="form.processing">
+                <PrimaryButton type="submit" class="ms-3" :class="{ 'opacity-25': form.processing }" :disabled="form.processing">
                     Kirim Verifikasi
                 </PrimaryButton>
             </div>
