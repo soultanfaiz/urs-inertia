@@ -3,17 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Models\SubDevelopmentActivity;
+use Illuminate\Support\Facades\Redirect;
 use Illuminate\Http\Request;
 
 class SubDevelopmentActivityController extends Controller
 {
-    /**
-     * Terapkan middleware otorisasi untuk memastikan hanya admin yang bisa mengakses.
-     */
-    public function __construct()
-    {
-        $this->middleware('role:admin');
-    }
 
     /**
      * Toggle the completion status of a sub-development activity.
@@ -40,12 +34,8 @@ class SubDevelopmentActivityController extends Controller
             $parentActivity->update(['is_completed' => false]);
         }
 
-        // Dengan Inertia, semua request dari frontend adalah XHR, jadi kita selalu mengembalikan JSON.
-        return response()->json([
-            'success' => true,
-            'message' => 'Status detail pekerjaan berhasil diperbarui.',
-            'parent_activity_completed' => $parentActivity->is_completed,
-        ]);
+        // Redirect back to the previous page. Inertia will handle the prop updates.
+        return Redirect::back()->with('success', 'Status detail pekerjaan berhasil diperbarui.');
     }
 
     /**
@@ -71,13 +61,8 @@ class SubDevelopmentActivityController extends Controller
             'is_completed' => $hasSubActivities && $allSubActivitiesCompleted
         ]);
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Detail pekerjaan berhasil dihapus.',
-            // Kirim status terbaru dari parent activity untuk memudahkan update di frontend
-            'parent_activity_id' => $parentActivityId,
-            'parent_activity_completed' => $parentActivity->is_completed,
-        ]);
+        // Redirect back. Inertia will update the page with the latest data.
+        return Redirect::back()->with('success', 'Detail pekerjaan berhasil dihapus.');
     }
 
     /**
@@ -92,21 +77,12 @@ class SubDevelopmentActivityController extends Controller
             'development_activity_id' => 'required|exists:development_activities,id',
         ]);
 
-        $createdSubActivities = [];
-
         foreach ($validated['sub_activities'] as $subActivityName) {
-            $subActivity = SubDevelopmentActivity::create([
+            SubDevelopmentActivity::create([
                 'development_activity_id' => $validated['development_activity_id'],
                 'name' => $subActivityName,
                 'is_completed' => false,
             ]);
-
-            $createdSubActivities[] = [
-                'id' => $subActivity->id,
-                'name' => $subActivity->name,
-                'is_completed' => $subActivity->is_completed,
-                'created_at' => $subActivity->created_at->toDateTimeString(),
-            ];
         }
 
         // Update parent activity completion status
@@ -118,13 +94,7 @@ class SubDevelopmentActivityController extends Controller
             'is_completed' => $hasSubActivities && $allSubActivitiesCompleted
         ]);
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Detail pekerjaan berhasil ditambahkan.',
-            'sub_activities' => $createdSubActivities,
-            // Kirim juga status terbaru dari parent activity
-            'parent_activity_id' => $validated['development_activity_id'],
-            'parent_activity_completed' => $parentActivity->is_completed,
-        ]);
+        // Redirect back. Inertia will update the page with the latest data.
+        return Redirect::back()->with('success', 'Detail pekerjaan berhasil ditambahkan.');
     }
 }

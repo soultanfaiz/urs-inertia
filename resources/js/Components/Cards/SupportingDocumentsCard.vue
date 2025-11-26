@@ -125,7 +125,7 @@ const getVerificationStatusClass = (status) => {
                                 </div>
                                 <!-- Right Side: Actions -->
                                 <div class="flex items-center self-end flex-shrink-0 space-x-2 sm:self-center">
-                                    <button v-if="isAdmin && doc.verification_status === enums.verificationStatus.MENUNGGU" @click="emit('open-verify-doc-modal', doc.id)" type="button" class="inline-flex items-center px-2.5 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded shadow-sm hover:bg-gray-50" title="Verifikasi Dokumen">
+                                    <button v-if="isAdmin && doc.verification_status === enums.verificationStatus.MENUNGGU" @click="emit('open-verify-doc-modal', doc)" type="button" class="inline-flex items-center px-2.5 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded shadow-sm hover:bg-gray-50" title="Verifikasi Dokumen">
                                         Verifikasi
                                     </button>
                                     <a :href="route('app-request.doc-support.download', doc.id)" target="_blank" class="text-blue-600 hover:text-blue-800" title="Unduh Dokumen">

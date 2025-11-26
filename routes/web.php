@@ -3,6 +3,7 @@
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\AppRequestController; // Tambahkan ini
+use App\Http\Controllers\SubDevelopmentActivityController;
 use Illuminate\Foundation\Application;
 use App\Http\Controllers\DevelopmentActivityController;
 use Illuminate\Support\Facades\Route;
@@ -45,7 +46,15 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::patch('/development-activities/{developmentActivity}', [DevelopmentActivityController::class, 'update'])->name('development-activity.update');
         Route::delete('/development-activities/{developmentActivity}', [DevelopmentActivityController::class, 'destroy'])->name('development-activity.destroy');
         Route::post('/development-activities/reorder', [DevelopmentActivityController::class, 'reorder'])->name('development-activity.reorder');
+
+        // Rute untuk Sub-Development Activities (Hanya Admin)
+        Route::post('/sub-activities', [SubDevelopmentActivityController::class, 'store'])->name('sub-activity.store');
+        Route::patch('/sub-activities/{subActivity}/toggle-status', [SubDevelopmentActivityController::class, 'toggleStatus'])->name('sub-activity.toggle-status');
+        Route::delete('/sub-activities/{subActivity}', [SubDevelopmentActivityController::class, 'destroy'])->name('sub-activity.destroy');
         // Tambahkan rute lain yang memerlukan hak akses admin di sini
+
+        // Rute untuk menambahkan sub-aktivitas ke aktivitas pengembangan yang ada
+        Route::post('/development-activities/{developmentActivity}/add-sub-activities', [DevelopmentActivityController::class, 'addSubActivities'])->name('development-activity.add-sub-activities');
     });
 
     // ... (Tambahkan rute custom lain di sini jika ada)

@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed, watch } from 'vue';
 import { usePage, useForm } from '@inertiajs/vue3';
+import axios from 'axios';
 import { format, parseISO, isPast, differenceInDays, formatDistanceToNow } from 'date-fns'; // Corrected import
 import { id as idLocale } from 'date-fns/locale';
 
@@ -102,13 +103,29 @@ const cancelEdit = (activityId) => {
     delete editForms.value[activityId];
 };
 
-const saveEdit = (activityId) => {
+const saveEdit = async (activityId) => {
     const form = editForms.value[activityId];
-    if (form) {
-        form.patch(route('development-activity.update', activityId), {
-            preserveScroll: true,
-            onSuccess: () => cancelEdit(activityId),
-        });
+    if (!form) return;
+
+    form.processing = true;
+
+    try {
+        await axios.patch(route('development-activity.update', activityId), form.data());
+
+        // Manually update the local state on success
+        const activity = activities.value.find(a => a.id === activityId);
+        if (activity) {
+            activity.description = form.description;
+            activity.end_date = form.end_date; // The format is already yyyy-MM-dd, which is fine for display logic
+        }
+
+        // Close the edit form
+        cancelEdit(activityId);
+    } catch (error) {
+        console.error('Error updating activity:', error.response?.data?.errors || error.message);
+        // You can handle validation errors here, e.g., form.setError(error.response.data.errors)
+    } finally {
+        form.processing = false;
     }
 };
 
@@ -121,14 +138,14 @@ const deleteActivity = (activityId) => {
 };
 
 const toggleSubActivity = (subActivityId, currentStatus) => {
-    useForm({ is_completed: !currentStatus }).patch(route('sub-activity.toggle-status', subActivityId), {
+    useForm({ is_completed: !currentStatus }).patch(route('sub-activity.toggle-status', { subActivity: subActivityId }), {
         preserveScroll: true,
     });
 };
 
 const deleteSubActivity = (subActivityId) => {
     if (confirm('Anda yakin ingin menghapus detail pekerjaan ini?')) {
-        useForm({}).delete(route('sub-activity.destroy', subActivityId), {
+        useForm({}).delete(route('sub-activity.destroy', { subActivity: subActivityId }), {
             preserveScroll: true,
         });
     }
@@ -136,8 +153,7 @@ const deleteSubActivity = (subActivityId) => {
 
 const startAddSubActivity = (activityId) => {
     newSubActivityForms.value[activityId] = useForm({
-        development_activity_id: activityId,
-        name: '',
+        sub_activities: [''], // Start with one empty field
     });
 };
 
@@ -145,13 +161,40 @@ const cancelAddSubActivity = (activityId) => {
     delete newSubActivityForms.value[activityId];
 };
 
-const saveSubActivity = (activityId) => {
+const saveSubActivity = async (activityId) => {
     const form = newSubActivityForms.value[activityId];
-    if (form) {
-        form.post(route('sub-activity.store'), {
-            preserveScroll: true,
-            onSuccess: () => cancelAddSubActivity(activityId),
+    if (!form) return;
+
+    // Filter out empty strings before submitting
+    const nonEmptySubActivities = form.sub_activities.filter(s => s.trim() !== '');
+    if (nonEmptySubActivities.length === 0) {
+        console.error("Cannot submit empty sub-activities.");
+        return;
+    }
+
+    form.processing = true;
+
+    try {
+        const response = await axios.post(route('development-activity.add-sub-activities', activityId), {
+            sub_activities: nonEmptySubActivities
         });
+
+        // Manually update the local state on success
+        const parentActivity = activities.value.find(a => a.id === activityId);
+        if (parentActivity) {
+            // Add new sub-activities to the list
+            parentActivity.sub_activities.push(...response.data.new_sub_activities);
+            // Update parent status if it was changed
+            parentActivity.is_completed = response.data.parent_activity_completed;
+        }
+
+        // Close the form
+        cancelAddSubActivity(activityId);
+    } catch (error) {
+        console.error('Error adding sub-activity:', error.response?.data?.errors || error.message);
+        // You can handle form errors here, e.g., form.setError(...)
+    } finally {
+        form.processing = false;
     }
 };
 
@@ -190,20 +233,27 @@ const handleDragEnd = () => {
     dragIndex.value = null;
 };
 
-const handleDrop = (event, targetIndex) => {
+const handleDrop = async (event, targetIndex) => {
     if (dragIndex.value === null || dragIndex.value === targetIndex || !isAdmin.value || !isEditingAll.value) {
         return;
     }
 
+    // Optimistic UI update
+    const originalActivities = JSON.parse(JSON.stringify(activities.value)); // Deep copy for rollback
     const movedItem = activities.value.splice(dragIndex.value, 1)[0];
     activities.value.splice(targetIndex, 0, movedItem);
 
     const orderedIds = activities.value.map(a => a.id);
 
-    useForm({ ordered_ids: orderedIds }).post(route('development-activity.reorder'), {
-        preserveScroll: true,
-        // No need for onSuccess, the UI is already updated optimistically
-    });
+    try {
+        await axios.post(route('development-activity.reorder'), { ordered_ids: orderedIds });
+        // On success, do nothing, the optimistic update is correct.
+    } catch (error) {
+        console.error('Failed to reorder activities:', error);
+        // Rollback the optimistic update on failure
+        activities.value = originalActivities;
+        // Optionally, show an error message to the user.
+    }
 };
 
 </script>
@@ -309,19 +359,24 @@ const handleDrop = (event, targetIndex) => {
                         <!-- Add Sub-Activity Form -->
                         <div v-if="isAdmin && isEditingAll" class="mt-3 pt-3 border-t border-gray-200">
                             <form v-if="newSubActivityForms[activity.id]" @submit.prevent="saveSubActivity(activity.id)" class="mb-3 p-3 bg-white border border-gray-200 rounded-md">
-                                <div class="space-y-3">
-                                    <div>
-                                        <label :for="`sub-activity-input-${activity.id}`" class="text-xs font-medium text-gray-700">Detail Pekerjaan Baru</label>
-                                        <input type="text" v-model="newSubActivityForms[activity.id].name" :id="`sub-activity-input-${activity.id}`" @keydown.enter.prevent="saveSubActivity(activity.id)" placeholder="Contoh: Membuat endpoint API" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
-                                    </div>
-                                    <div class="flex items-center gap-2">
-                                        <button type="submit" :disabled="newSubActivityForms[activity.id].processing" class="inline-flex items-center px-3 py-1.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md">
-                                            {{ newSubActivityForms[activity.id].processing ? 'Menyimpan...' : 'Simpan' }}
-                                        </button>
-                                        <button type="button" @click="cancelAddSubActivity(activity.id)" :disabled="newSubActivityForms[activity.id].processing" class="inline-flex items-center px-3 py-1.5 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md">
-                                            Batal
+                                <label class="text-xs font-medium text-gray-700">Detail Pekerjaan Baru</label>
+                                <div class="space-y-2 mt-1">
+                                    <div v-for="(sub, index) in newSubActivityForms[activity.id].sub_activities" :key="index" class="flex items-center space-x-2">
+                                        <input type="text" v-model="newSubActivityForms[activity.id].sub_activities[index]" @keydown.enter.prevent="newSubActivityForms[activity.id].sub_activities.push('')" class="block w-full text-sm border-gray-300 rounded-md shadow-sm" placeholder="Contoh: Membuat endpoint API">
+                                        <button type="button" @click="newSubActivityForms[activity.id].sub_activities.splice(index, 1)" v-show="newSubActivityForms[activity.id].sub_activities.length > 1" class="text-red-500 hover:text-red-700" title="Hapus">
+                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
                                         </button>
                                     </div>
+                                </div>
+                                <button type="button" @click="newSubActivityForms[activity.id].sub_activities.push('')" class="mt-2 text-sm text-blue-600 hover:text-blue-800">+ Tambah Detail</button>
+
+                                <div class="flex items-center gap-2 mt-3">
+                                    <button type="submit" :disabled="newSubActivityForms[activity.id].processing" class="inline-flex items-center px-3 py-1.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md disabled:opacity-50">
+                                        {{ newSubActivityForms[activity.id].processing ? 'Menyimpan...' : 'Simpan Detail' }}
+                                    </button>
+                                    <button type="button" @click="cancelAddSubActivity(activity.id)" :disabled="newSubActivityForms[activity.id].processing" class="inline-flex items-center px-3 py-1.5 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md">
+                                        Batal
+                                    </button>
                                 </div>
                             </form>
                             <button v-else @click="startAddSubActivity(activity.id)" type="button" class="inline-flex items-center px-3 py-2 text-sm font-medium text-blue-600 hover:text-blue-700 bg-white hover:bg-gray-50 border border-blue-200 hover:border-blue-300 rounded-md">

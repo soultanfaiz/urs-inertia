@@ -31,7 +31,7 @@ class DevelopmentActivityController extends Controller
             // 1. Buat aktivitas utama
             $activityData = [
                 'description' => $validated['description'],
-                                'start_date' => $validated['start_date'] ?? null,
+                'start_date' => $validated['start_date'] ?? null,
                 'end_date' => $validated['end_date'] ?? null,
                 'iteration_count' => $newIteration,
             ];
@@ -96,7 +96,7 @@ class DevelopmentActivityController extends Controller
 
         $developmentActivity->update($validated);
 
-        return redirect()->route('app-request.show', $developmentActivity->app_request_id)->with('success', 'Aktivitas pengembangan berhasil diperbarui.');
+        return redirect()->route('app-requests.show', $developmentActivity->app_request_id)->with('success', 'Aktivitas pengembangan berhasil diperbarui.');
     }
 
     /**
@@ -114,7 +114,7 @@ class DevelopmentActivityController extends Controller
             ]);
         }
 
-        return redirect()->route('app-request.show', $appRequestId)->with('success', 'Aktivitas pengembangan berhasil dihapus.');
+        return redirect()->route('app-requests.show', $appRequestId)->with('success', 'Aktivitas pengembangan berhasil dihapus.');
     }
 
     /**

@@ -16,8 +16,8 @@ return new class extends Migration
             $table->foreignId('app_request_id')->constrained('app_requests')->onDelete('cascade');
             $table->unsignedInteger('iteration_count');
             $table->text('description');
-            $table->date('start_date');
-            $table->date('end_date');
+            $table->date('start_date')->nullable();
+            $table->date('end_date')->nullable();
             $table->boolean('is_completed')->default(false);
             $table->timestamps();
         });
