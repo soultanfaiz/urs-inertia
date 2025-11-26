@@ -180,12 +180,12 @@ const saveSubActivity = async (activityId) => {
         });
 
         // Manually update the local state on success
-        const parentActivity = activities.value.find(a => a.id === activityId);
-        if (parentActivity) {
-            // Add new sub-activities to the list
-            parentActivity.sub_activities.push(...response.data.new_sub_activities);
-            // Update parent status if it was changed
-            parentActivity.is_completed = response.data.parent_activity_completed;
+        const updatedActivity = response.data.activity;
+        const activityIndex = activities.value.findIndex(a => a.id === activityId);
+        if (activityIndex !== -1 && updatedActivity) {
+            // Replace the old activity data with the fresh data from the server.
+            // This ensures all properties, including `is_completed`, are updated.
+            activities.value[activityIndex] = { ...activities.value[activityIndex], ...updatedActivity };
         }
 
         // Close the form

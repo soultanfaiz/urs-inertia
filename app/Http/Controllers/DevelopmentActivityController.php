@@ -209,15 +209,13 @@ class DevelopmentActivityController extends Controller
                 $developmentActivity->update(['is_completed' => false]);
             }
 
-            // Dengan Inertia/Vue, cukup kirim data sub-aktivitas yang baru dibuat.
-            // Frontend akan menggabungkannya ke dalam state yang ada.
+            // Muat ulang aktivitas dengan sub-aktivitasnya untuk mendapatkan data terbaru.
+            $updatedActivity = $developmentActivity->load('subActivities');
 
             return response()->json([
                 'success' => true,
                 'message' => 'Detail pekerjaan berhasil ditambahkan.',
-                'new_sub_activities' => $newSubActivities,
-                'parent_activity_completed' => $developmentActivity->is_completed, // Kirim status terbaru parent
-                'has_sub_activities' => true, // Flag untuk UI
+                'activity' => $updatedActivity, // Kirim seluruh objek aktivitas yang sudah diupdate
             ]);
 
         } catch (\Illuminate\Validation\ValidationException $e) {
