@@ -5,17 +5,29 @@ namespace App\Http\Controllers;
 use App\Models\SubDevelopmentActivity;
 use Illuminate\Support\Facades\Redirect;
 use Illuminate\Http\Request;
+use Illuminate\Routing\Controller;
+
 
 class SubDevelopmentActivityController extends Controller
 {
 
     /**
+     * Create a new controller instance.
+     *
+     * @return void
+     */
+    public function __construct()
+    {
+        $this->middleware('auth');
+    }
+    /**
      * Toggle the completion status of a sub-development activity.
      */
     public function toggleStatus(Request $request, SubDevelopmentActivity $subActivity)
     {
-        // Otorisasi bisa ditambahkan di sini jika diperlukan,
-        // namun route sudah dilindungi oleh middleware 'role:admin'
+        if (!auth()->user()->hasRole('admin')) {
+            abort(403, 'Hanya admin yang dapat melakukan verifikasi.');
+        }
 
         // Toggle status is_completed
         $subActivity->update([
@@ -43,8 +55,9 @@ class SubDevelopmentActivityController extends Controller
      */
     public function destroy(Request $request, SubDevelopmentActivity $subActivity)
     {
-        // Otorisasi
-        // $this->authorize('delete', $subActivity);
+        if (!auth()->user()->hasRole('admin')) {
+            abort(403, 'Hanya admin yang dapat melakukan verifikasi.');
+        }
 
         $parentActivity = $subActivity->developmentActivity;
         $parentActivityId = $parentActivity->id;
@@ -70,6 +83,9 @@ class SubDevelopmentActivityController extends Controller
      */
     public function store(Request $request)
     {
+        if (!auth()->user()->hasRole('admin')) {
+            abort(403, 'Hanya admin yang dapat melakukan verifikasi.');
+        }
         // Validasi request
         $validated = $request->validate([
             'sub_activities' => 'required|array|min:1',

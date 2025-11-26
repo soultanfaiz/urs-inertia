@@ -38,5 +38,13 @@ class RolesAndUsersSeeder extends Seeder
             'password' => Hash::make('password'), // Ganti dengan password yang aman
         ]);
         $regularUser->assignRole($userRole);
+
+        // Buat user biasa tambahan
+        $anotherUser = User::create([
+            'name' => 'Regular User Lain',
+            'email' => 'user2@email.com',
+            'password' => Hash::make('password'), // Ganti dengan password yang aman
+        ]);
+        $anotherUser->assignRole($userRole);
     }
 }

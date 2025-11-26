@@ -2,19 +2,35 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Controllers\Controller;
 use App\Models\AppRequest;
 use App\Models\DevelopmentActivity;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Routing\Controller;
+
+
 
 class DevelopmentActivityController extends Controller
 {
+
+    /**
+     * Create a new controller instance.
+     *
+     * @return void
+     */
+    public function __construct()
+    {
+        $this->middleware('auth');
+    }
     /**
      * Menyimpan aktivitas pengembangan baru.
      */
     public function store(Request $request, AppRequest $appRequest)
     {
+        if (!auth()->user()->hasRole('admin')) {
+            abort(403, 'Hanya admin yang dapat melakukan verifikasi.');
+        }
+
         $validated = $request->validate([
             'description' => 'required|string',
             'sub_activities' => 'required|array|min:1',
@@ -59,6 +75,10 @@ class DevelopmentActivityController extends Controller
      */
     public function update(Request $request, DevelopmentActivity $developmentActivity)
     {
+        if (!auth()->user()->hasRole('admin')) {
+            abort(403, 'Hanya admin yang dapat melakukan verifikasi.');
+        }
+
         if ($request->wantsJson()) {
             // Handle AJAX request for updating description and dates
             $validated = $request->validate([
@@ -104,6 +124,10 @@ class DevelopmentActivityController extends Controller
      */
     public function destroy(Request $request, DevelopmentActivity $developmentActivity)
     {
+        if (!auth()->user()->hasRole('admin')) {
+            abort(403, 'Hanya admin yang dapat melakukan verifikasi.');
+        }
+
         $appRequestId = $developmentActivity->app_request_id;
         $developmentActivity->delete();
 
@@ -123,6 +147,10 @@ class DevelopmentActivityController extends Controller
      */
     public function reorder(Request $request)
     {
+        if (!auth()->user()->hasRole('admin')) {
+            abort(403, 'Hanya admin yang dapat melakukan verifikasi.');
+        }
+
         try {
             $validated = $request->validate([
                 'ordered_ids' => 'required|array',
@@ -166,6 +194,10 @@ class DevelopmentActivityController extends Controller
      */
     public function updateStatus(Request $request, DevelopmentActivity $developmentActivity)
     {
+        if (!auth()->user()->hasRole('admin')) {
+            abort(403, 'Hanya admin yang dapat melakukan verifikasi.');
+        }
+
         $validated = $request->validate([
             'is_completed' => 'required|boolean',
         ]);
@@ -185,6 +217,9 @@ class DevelopmentActivityController extends Controller
      */
     public function addSubActivities(Request $request, DevelopmentActivity $developmentActivity)
     {
+        if (!auth()->user()->hasRole('admin')) {
+            abort(403, 'Hanya admin yang dapat melakukan verifikasi.');
+        }
         // Gunakan try-catch untuk menangani ValidationException secara manual
         try {
             $validated = $request->validate([
@@ -217,7 +252,6 @@ class DevelopmentActivityController extends Controller
                 'message' => 'Detail pekerjaan berhasil ditambahkan.',
                 'activity' => $updatedActivity, // Kirim seluruh objek aktivitas yang sudah diupdate
             ]);
-
         } catch (\Illuminate\Validation\ValidationException $e) {
             // Jika validasi gagal, kirim respons JSON dengan pesan error
             return response()->json([
