@@ -63,4 +63,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::resource('app-requests', AppRequestController::class);
 });
 
+// Route::get('/test-cloudinary', function () {
+//     dd([
+//         'raw_env' => env('CLOUDINARY_URL'),
+//         'config' => config('cloudinary.cloud_url')
+//     ]);
+// });
+
 require __DIR__.'/auth.php';

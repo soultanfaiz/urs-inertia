@@ -15,6 +15,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rules\Enum;
 use Inertia\Inertia; // Import Inertia
 use Illuminate\Routing\Controller;
+use Cloudinary\Api\Upload\UploadApi;
 
 class AppRequestController extends Controller
 {
@@ -55,7 +56,7 @@ class AppRequestController extends Controller
     {
         // Render komponen Vue 'AppRequest/Create'
         return Inertia::render('AppRequest/Create', [
-            'instansi' => collect(Instansi::cases())->map(fn ($instansi) => [
+            'instansi' => collect(Instansi::cases())->map(fn($instansi) => [
                 'value' => $instansi->value,
                 'label' => $instansi->value,
             ]),
@@ -74,16 +75,30 @@ class AppRequestController extends Controller
             'file_pdf' => 'required|file|mimes:pdf|max:2048',
         ]);
 
-        $path = $request->file('file_pdf')->store('pdfs');
+
+        try {
+            // Upload menggunakan Library Native (bukan Facade Laravel)
+            $upload = (new UploadApi())->upload($request->file('file_pdf')->getRealPath(), [
+                'folder' => 'pdfs',
+                'resource_type' => 'auto',
+                'upload_preset' => 'urs-inertia' // Opsional
+            ]);
+
+            // Ambil URL (Gunakan kurung siku [] karena hasilnya Array)
+            $path = $upload['secure_url'];
+        } catch (\Exception $e) {
+            return back()->withErrors(['file_pdf' => 'Gagal Upload: ' . $e->getMessage()])->withInput();
+        }
+        // --- SELESAI CONFIG MANUAL ---
 
         $appRequest = AppRequest::create([
             'user_id' => auth()->id(),
             'title' => $validatedData['title'],
             'description' => $validatedData['description'],
-            'start_date' => now(), // Set default start date
-            'end_date' => now()->addMonth(),   // Set default end date
+            'start_date' => now(),
+            'end_date' => now()->addMonth(),
             'instansi' => $validatedData['instansi'],
-            'file_path' => $path,
+            'file_path' => $path, // Path yang didapat dari manual upload
             'status' => RequestStatus::PERMOHONAN,
             'verification_status' => VerificationStatus::MENUNGGU,
         ]);
@@ -122,7 +137,7 @@ class AppRequestController extends Controller
         ]);
     }
 
- /**
+    /**
      * Memperbarui status permohonan yang sudah diverifikasi (oleh admin).
      */
     public function updateStatus(Request $request, AppRequest $appRequest)
@@ -177,31 +192,52 @@ class AppRequestController extends Controller
     // ... Pastikan Anda menyalin semua metode lainnya dari controller asli Anda ke sini.
     // ... Saya akan menyalin beberapa metode penting sebagai contoh.
 
-     public function storeDocSupport(Request $request, AppRequest $appRequest, RequestHistory $history)
+    public function storeDocSupport(Request $request, AppRequest $appRequest, RequestHistory $history)
     {
         // Otorisasi: Hanya admin atau pemilik permohonan yang bisa menambahkan dokumen pendukung.
         if (!auth()->user()->hasRole('admin') && auth()->id() !== $appRequest->user_id) {
             abort(403, 'Anda tidak diizinkan menambahkan dokumen pendukung untuk permohonan ini.');
         }
 
-        // Otorisasi sederhana: pastikan history ini milik appRequest yang benar
         if ($history->app_request_id !== $appRequest->id) {
             abort(404);
         }
 
+        // ... (Kode validasi sebelumnya tetap sama)
         $validated = $request->validate([
-            'file_support_pdf' => 'required|file|mimes:pdf|max:2048', // Maks 2MB
+            'file_support_pdf' => 'required|file|mimes:pdf|max:2048',
         ]);
 
-        $file = $validated['file_support_pdf'];
-        $path = $file->store('support_docs');
+        $file = $request->file('file_support_pdf');
+
+
+        // 2. Unggah menggunakan UploadApi (Bukan Facade Cloudinary)
+        try {
+            $upload = (new UploadApi())->upload($request->file('file_support_pdf')->getRealPath(), [
+                'folder' => 'support_docs',
+                'resource_type' => 'auto',
+                'upload_preset' => 'urs-inertia' // Opsional, hapus jika error
+            ]);
+
+            // 3. Ambil data hasil upload
+            // PERHATIAN: Hasilnya berupa ARRAY, bukan Object.
+            // Jadi pakai kurung siku [], bukan tanda panah ->
+
+            $path = $upload['secure_url']; // Pengganti getSecurePath()
+            $publicId = $upload['public_id']; // Pengganti getPublicId()
+
+        } catch (\Exception $e) {
+            return back()->withErrors(['file_support_pdf' => 'Gagal upload ke Cloudinary: ' . $e->getMessage()]);
+        }
+
+        // --- SELESAI PERUBAHAN ---
 
         $history->docSupports()->create([
-            // Simpan status progres dari riwayat terkait
             'request_status' => $history->status,
-            'file_path' => $path,
+            'file_path' => $path, // Sudah berisi URL string
             'file_name' => $file->getClientOriginalName(),
-            'verification_status' => VerificationStatus::MENUNGGU->value,
+            'verification_status' => VerificationStatus::MENUNGGU->value, // Pastikan Enum sudah di-import
+            'public_id' => $publicId,
         ]);
 
         return redirect()->route('app-requests.show', $appRequest)->with('success', 'Dokumen pendukung berhasil ditambahkan!');
@@ -217,17 +253,31 @@ class AppRequestController extends Controller
             abort(403, 'Anda tidak diizinkan menambahkan bukti gambar untuk permohonan ini.');
         }
 
-        // Otorisasi sederhana: pastikan history ini milik appRequest yang benar
         if ($history->app_request_id !== $appRequest->id) {
             abort(404);
         }
 
         $validated = $request->validate([
-            'file_support_image' => 'required|file|mimes:jpeg,jpg,png,gif|max:5120', // Maks 5MB
+            'file_support_image' => 'required|file|mimes:jpeg,jpg,png,gif|max:5120',
         ]);
 
-        $file = $validated['file_support_image'];
-        $path = $file->store('support_images');
+        $file = $request->file('file_support_image');
+
+
+        try {
+            // Upload menggunakan Library Native (bukan Facade Laravel)
+            $upload = (new UploadApi())->upload($request->file('file_support_image')->getRealPath(), [
+                'folder' => 'images',
+                'resource_type' => 'auto',
+                'upload_preset' => 'urs-inertia' // Opsional
+            ]);
+
+            // Ambil URL (Gunakan kurung siku [] karena hasilnya Array)
+            $path = $upload['secure_url'];
+        } catch (\Exception $e) {
+            return back()->withErrors(['file_pdf' => 'Gagal Upload: ' . $e->getMessage()])->withInput();
+        }
+
 
         $history->imageSupports()->create([
             // Simpan status progres dari riwayat terkait
@@ -235,6 +285,7 @@ class AppRequestController extends Controller
             'image_path' => $path,
             'image_name' => $file->getClientOriginalName(),
             'verification_status' => VerificationStatus::MENUNGGU->value,
+            'public_id' => $publicId, // Simpan public_id
         ]);
 
         return redirect()->route('app-requests.show', $appRequest)->with('success', 'Bukti dukung gambar berhasil ditambahkan!');
@@ -248,14 +299,15 @@ class AppRequestController extends Controller
         if (auth()->user()->id !== $appRequest->user_id && !auth()->user()->hasRole('admin')) {
             abort(403, 'Anda tidak diizinkan mengakses file ini.');
         }
-        if (!$appRequest->file_path || !Storage::exists($appRequest->file_path)) {
+        if (!$appRequest->file_path) {
             abort(404, 'File tidak ditemukan.');
         }
-        return Storage::response(
-            $appRequest->file_path,
-            basename($appRequest->file_path),
-            ['Content-Type' => 'application/pdf', 'Content-Disposition' => 'inline; filename="' . basename($appRequest->file_path) . '"']
-        );
+
+        $url = $appRequest->file_path;
+
+        $downloadUrl = str_replace('/upload/', '/upload/fl_attachment/', $url);
+        // Redirect ke URL Cloudinary untuk menampilkan file
+        return redirect()->away($downloadUrl);
     }
 
     /**
@@ -307,7 +359,7 @@ class AppRequestController extends Controller
         return redirect()->route('app-requests.show', $appRequest)->with('success', 'Status permohonan berhasil diperbarui!');
     }
 
-      /**
+    /**
      * Mengunduh file dokumen pendukung.
      */
     public function downloadDocSupport(RequestDocSupport $docSupport)
@@ -320,22 +372,13 @@ class AppRequestController extends Controller
             abort(403, 'Anda tidak diizinkan mengakses file ini.');
         }
 
-        // Cek apakah file ada di storage
-        if (!Storage::exists($docSupport->file_path)) {
+        // Cek apakah path file ada di database
+        if (!$docSupport->file_path) {
             abort(404, 'File tidak ditemukan.');
         }
 
-        // Kirim file sebagai respons unduhan dengan nama file aslinya.
-        // Menggunakan Storage::response() untuk menampilkan preview di browser (inline)
-        // daripada memaksa unduhan (attachment).
-        return Storage::response(
-            $docSupport->file_path,
-            $docSupport->file_name,
-            [
-                'Content-Type' => 'application/pdf',
-                'Content-Disposition' => 'inline; filename="' . $docSupport->file_name . '"'
-            ]
-        );
+        // Redirect ke URL Cloudinary untuk menampilkan file
+        return redirect()->away($docSupport->file_path);
     }
 
     /**
@@ -350,13 +393,13 @@ class AppRequestController extends Controller
             abort(403, 'Anda tidak diizinkan mengakses gambar ini.');
         }
 
-        // Cek apakah file ada di storage
-        if (!Storage::exists($imageSupport->image_path)) {
+        // Cek apakah path gambar ada di database
+        if (!$imageSupport->image_path) {
             abort(404, 'Gambar tidak ditemukan.');
         }
 
-        // Kirim file sebagai respons untuk ditampilkan di browser
-        return Storage::response($imageSupport->image_path);
+        // Redirect ke URL Cloudinary untuk menampilkan gambar
+        return redirect()->away($imageSupport->image_path);
     }
 
     /**
