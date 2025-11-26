@@ -10,12 +10,13 @@ use App\Models\RequestHistory;
 use App\Models\RequestImageSupport;
 use App\Enums\RequestStatus;
 use App\Enums\Instansi;
-use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rules\Enum;
-use Inertia\Inertia; // Import Inertia
+use Inertia\Inertia;
 use Illuminate\Routing\Controller;
 use Cloudinary\Api\Upload\UploadApi;
+use Illuminate\Support\Str;
 
 class AppRequestController extends Controller
 {
@@ -80,7 +81,7 @@ class AppRequestController extends Controller
             // Upload menggunakan Library Native (bukan Facade Laravel)
             $upload = (new UploadApi())->upload($request->file('file_pdf')->getRealPath(), [
                 'folder' => 'pdfs',
-                'resource_type' => 'auto',
+                'resource_type' => 'raw',
                 'upload_preset' => 'urs-inertia' // Opsional
             ]);
 
@@ -215,7 +216,7 @@ class AppRequestController extends Controller
         try {
             $upload = (new UploadApi())->upload($request->file('file_support_pdf')->getRealPath(), [
                 'folder' => 'support_docs',
-                'resource_type' => 'auto',
+                'resource_type' => 'raw',
                 'upload_preset' => 'urs-inertia' // Opsional, hapus jika error
             ]);
 
@@ -224,7 +225,6 @@ class AppRequestController extends Controller
             // Jadi pakai kurung siku [], bukan tanda panah ->
 
             $path = $upload['secure_url']; // Pengganti getSecurePath()
-            $publicId = $upload['public_id']; // Pengganti getPublicId()
 
         } catch (\Exception $e) {
             return back()->withErrors(['file_support_pdf' => 'Gagal upload ke Cloudinary: ' . $e->getMessage()]);
@@ -237,7 +237,6 @@ class AppRequestController extends Controller
             'file_path' => $path, // Sudah berisi URL string
             'file_name' => $file->getClientOriginalName(),
             'verification_status' => VerificationStatus::MENUNGGU->value, // Pastikan Enum sudah di-import
-            'public_id' => $publicId,
         ]);
 
         return redirect()->route('app-requests.show', $appRequest)->with('success', 'Dokumen pendukung berhasil ditambahkan!');
@@ -268,7 +267,7 @@ class AppRequestController extends Controller
             // Upload menggunakan Library Native (bukan Facade Laravel)
             $upload = (new UploadApi())->upload($request->file('file_support_image')->getRealPath(), [
                 'folder' => 'images',
-                'resource_type' => 'auto',
+                'resource_type' => 'image',
                 'upload_preset' => 'urs-inertia' // Opsional
             ]);
 
@@ -285,7 +284,6 @@ class AppRequestController extends Controller
             'image_path' => $path,
             'image_name' => $file->getClientOriginalName(),
             'verification_status' => VerificationStatus::MENUNGGU->value,
-            'public_id' => $publicId, // Simpan public_id
         ]);
 
         return redirect()->route('app-requests.show', $appRequest)->with('success', 'Bukti dukung gambar berhasil ditambahkan!');
@@ -305,9 +303,32 @@ class AppRequestController extends Controller
 
         $url = $appRequest->file_path;
 
-        $downloadUrl = str_replace('/upload/', '/upload/fl_attachment/', $url);
-        // Redirect ke URL Cloudinary untuk menampilkan file
-        return redirect()->away($downloadUrl);
+    // Cek safety: Jika URL kosong
+    if (empty($url)) {
+        abort(404, 'Link file tidak ditemukan di database.');
+    }
+
+ $response = Http::withoutVerifying()->get($url);
+
+    if ($response->failed()) {
+        // Jika error, kita tampilkan pesan debug biar tahu kenapa
+        return response()->json([
+            'message' => 'Gagal mengambil file dari Cloudinary',
+            'status' => $response->status(),
+            'target_url' => $url // Kita cek URL apa yang sebenarnya diakses
+        ], 404);
+    }
+
+
+    // 4. Buat Nama File yang Bagus
+    $filename = 'Dokumen_' . str_replace([' ', '/'], '_', $appRequest->title ?? 'download') . '.pdf';
+
+    // 5. Kirim ke Browser User
+    return response()->streamDownload(function () use ($response) {
+        echo $response->body();
+    }, $filename, [
+        'Content-Type' => 'application/pdf',
+    ]);
     }
 
     /**
@@ -364,21 +385,40 @@ class AppRequestController extends Controller
      */
     public function downloadDocSupport(RequestDocSupport $docSupport)
     {
-        // Otorisasi: Pastikan pengguna adalah pemilik permohonan atau admin.
-        // Kita mengambil AppRequest melalui relasi: DocSupport -> History -> AppRequest
+      // 1. Otorisasi
         $appRequest = $docSupport->requestHistory->appRequest;
 
         if (auth()->user()->id !== $appRequest->user_id && !auth()->user()->hasRole('admin')) {
             abort(403, 'Anda tidak diizinkan mengakses file ini.');
         }
 
-        // Cek apakah path file ada di database
-        if (!$docSupport->file_path) {
+        // 2. Cek URL di Database
+        $url = $docSupport->file_path;
+        if (empty($url)) {
             abort(404, 'File tidak ditemukan.');
         }
 
-        // Redirect ke URL Cloudinary untuk menampilkan file
-        return redirect()->away($docSupport->file_path);
+        // 3. Ambil File dari Cloudinary (Server-to-Server)
+        // 'withoutVerifying' penting untuk mengatasi masalah SSL di Localhost Windows
+        $response = Http::withoutVerifying()->get($url);
+
+        if ($response->failed()) {
+            abort(404, 'Gagal mengambil file dari server penyimpanan.');
+        }
+
+        // 4. Tentukan Nama File
+        // Kita gunakan nama asli file jika ada, atau buat nama baru yang rapi
+        $originalName = $docSupport->file_name ?? 'Dokumen_Pendukung.pdf';
+        // Bersihkan nama file dari karakter aneh
+        $filename = Str::ascii($originalName);
+
+        // 5. Stream ke Browser
+        return response()->streamDownload(function () use ($response) {
+            echo $response->body();
+        }, $filename, [
+            // Paksa Content-Type jadi PDF (karena ini khusus fungsi dokumen)
+            'Content-Type' => 'application/pdf',
+        ]);
     }
 
     /**
@@ -386,20 +426,39 @@ class AppRequestController extends Controller
      */
     public function viewImageSupport(RequestImageSupport $imageSupport)
     {
-        // Otorisasi: Pastikan pengguna adalah pemilik permohonan atau admin
         $appRequest = $imageSupport->requestHistory->appRequest;
 
         if (auth()->user()->id !== $appRequest->user_id && !auth()->user()->hasRole('admin')) {
             abort(403, 'Anda tidak diizinkan mengakses gambar ini.');
         }
 
-        // Cek apakah path gambar ada di database
-        if (!$imageSupport->image_path) {
+        // 2. Cek URL
+        $url = $imageSupport->image_path;
+        if (empty($url)) {
             abort(404, 'Gambar tidak ditemukan.');
         }
 
-        // Redirect ke URL Cloudinary untuk menampilkan gambar
-        return redirect()->away($imageSupport->image_path);
+        // 3. Ambil Gambar dari Cloudinary
+        $response = Http::withoutVerifying()->get($url);
+
+        if ($response->failed()) {
+            abort(404, 'Gagal mengambil gambar dari server.');
+        }
+
+        // 4. Deteksi Content-Type (PENTING UNTUK GAMBAR)
+        // Agar browser tahu apakah ini JPG, PNG, atau GIF
+        $contentType = $response->header('Content-Type');
+
+        // Buat nama file default jika tidak ada nama di database
+        $nameFromDb = $imageSupport->image_name ?? 'bukti_dukung.jpg';
+        $filename = Str::ascii($nameFromDb);
+
+        // 5. Stream
+        return response()->streamDownload(function () use ($response) {
+            echo $response->body();
+        }, $filename, [
+            'Content-Type' => $contentType, // Dinamis sesuai isi file
+        ]);
     }
 
     /**
