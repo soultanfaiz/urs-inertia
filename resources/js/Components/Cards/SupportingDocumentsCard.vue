@@ -23,6 +23,11 @@ const enums = computed(() => usePage().props.enums); // Access enums from page p
 const isAdmin = computed(() => user.value?.roles?.some(role => role.name === 'admin'));
 const isOwner = computed(() => user.value.id === props.appRequest.user_id);
 
+const shouldShowCard = computed(() => {
+    const requestStatusEnum = enums.value.requestStatus;
+    return props.appRequest.status !== requestStatusEnum.PERMOHONAN;
+});
+
 // --- Computed properties for data processing ---
 
 // Flatten all documents and images from the histories
@@ -93,7 +98,7 @@ const getVerificationStatusClass = (status) => {
 </script>
 
 <template>
-    <div class="p-6 bg-white rounded-lg shadow">
+    <div v-if="shouldShowCard" class="p-6 bg-white rounded-lg shadow">
         <div class="flex items-center justify-between mb-4">
             <h3 class="text-lg font-semibold text-gray-800">Dokumen Pendukung</h3>
             <div v-if="isAdmin || isOwner" class="flex space-x-2">
@@ -159,7 +164,7 @@ const getVerificationStatusClass = (status) => {
                                 </div>
                                 <div class="flex items-center justify-between mt-1">
                                     <span class="text-xs text-gray-600 truncate" :title="image.image_name">{{ image.image_name }}</span>
-                                    <button v-if="isAdmin && image.verification_status === enums.verificationStatus.MENUNGGU" @click="emit('open-verify-image-modal', image.id)" type="button" class="ml-2 text-xs text-blue-600 hover:text-blue-800" title="Verifikasi Gambar">
+                                    <button v-if="isAdmin && image.verification_status === enums.verificationStatus.MENUNGGU" @click="emit('open-verify-image-modal', image)" type="button" class="ml-2 text-xs text-blue-600 hover:text-blue-800" title="Verifikasi Gambar">
                                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                                     </button>
                                 </div>

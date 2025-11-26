@@ -12,8 +12,8 @@ const props = defineProps({
         default: false,
     },
     imageSupport: {
-        type: Object,
-        required: true,
+        type: Object, // Can be null when modal is closed
+        default: null,
     },
 });
 
@@ -35,6 +35,8 @@ watch(() => props.show, (newVal) => {
 });
 
 const submit = () => {
+    if (!props.imageSupport) return;
+
     form.post(route('app-request.image-support.verify', props.imageSupport.id), {
         preserveScroll: true,
         onSuccess: () => {
@@ -50,17 +52,17 @@ const closeModal = () => {
 
 <template>
     <Modal :show="show" @close="closeModal" focusable>
-        <form @submit.prevent="submit" class="p-6">
+        <form v-if="imageSupport" @submit.prevent="submit" class="p-6">
             <h2 class="text-lg font-medium text-gray-900">
                 Verifikasi Gambar Pendukung
             </h2>
             <p class="mt-1 text-sm text-gray-600">
-                Setujui atau tolak gambar <span class="font-bold">{{ imageSupport.image_name }}</span>. Jika ditolak, alasan wajib diisi.
+                Setujui atau tolak gambar <span class="font-bold">{{ imageSupport?.image_name }}</span>. Jika ditolak, alasan wajib diisi.
             </p>
 
             <!-- Image Preview -->
             <div class="mt-4 flex justify-center">
-                <img :src="route('app-request.image-support.view', imageSupport.id)" :alt="imageSupport.image_name" class="max-h-48 max-w-xs rounded-lg border border-gray-200 object-contain">
+                <img :src="route('app-request.image-support.view', { imageSupport: imageSupport.id })" :alt="imageSupport.image_name" class="max-h-48 max-w-xs rounded-lg border border-gray-200 object-contain">
             </div>
 
             <!-- Status Selection -->

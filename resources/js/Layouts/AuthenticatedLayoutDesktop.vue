@@ -14,24 +14,23 @@ defineProps({
 
 <template>
     <div class="flex h-screen bg-gray-100">
-        <!-- Sidebar (Desktop - always visible) -->
         <aside
             class="z-30 flex w-64 shrink-0 flex-col border-r border-gray-200 bg-white text-gray-800 transition-all h-screen overflow-y-auto relative"
         >
-            <div class="p-4 min-h-full">
-                <div class="flex items-center mb-8">
+            <div class="min-h-full flex flex-col py-4">
+
+                <div class="flex items-center mb-8 px-6">
                     <span class="text-xl font-bold text-gray-800">Admin Panel</span>
                 </div>
 
-                <nav>
-                    <ul class="space-y-2">
-                        <li v-if="isAdmin">
+                <nav class="flex-1">
+                    <ul class="space-y-1"> <li v-if="isAdmin">
                             <NavLink
                                 :href="route('dashboard')"
                                 :active="page.component.startsWith('Dashboard')"
-                                class="flex items-center px-4 py-2 text-gray-700 rounded-md"
-                                active-class="bg-gray-100 text-gray-900"
-                                inactive-class="hover:bg-gray-100 hover:text-gray-900"
+                                class="flex w-full items-center px-6 py-3 text-left transition-colors duration-200"
+                                active-class="bg-blue-50 border-l-4 border-blue-500 text-blue-700"
+                                inactive-class="text-gray-600 hover:bg-gray-50 hover:text-gray-900 border-l-4 border-transparent"
                             >
                                 Dashboard
                             </NavLink>
@@ -40,9 +39,9 @@ defineProps({
                             <NavLink
                                 :href="route('app-requests.index')"
                                 :active="page.component.startsWith('AppRequest')"
-                                class="flex items-center px-4 py-2 text-gray-700 rounded-md"
-                                active-class="bg-gray-100 text-gray-900"
-                                inactive-class="hover:bg-gray-100 hover:text-gray-900"
+                                class="flex w-full items-center px-6 py-3 text-left transition-colors duration-200"
+                                active-class="bg-blue-50 border-l-4 border-blue-500 text-blue-700"
+                                inactive-class="text-gray-600 hover:bg-gray-50 hover:text-gray-900 border-l-4 border-transparent"
                             >
                                 Permohonan
                             </NavLink>
@@ -53,14 +52,10 @@ defineProps({
         </aside>
 
         <div class="flex flex-1 flex-col">
-            <!-- Top bar -->
             <header class="flex h-16 items-center justify-end border-b bg-white px-4 sm:px-6 lg:px-8">
-                <!-- Page Heading -->
                 <div v-if="$slots.header" class="flex-1">
                     <slot name="header" />
                 </div>
-
-                <!-- User menu dropdown -->
                 <div class="relative">
                     <Dropdown align="right" width="48">
                         <template #trigger>
@@ -81,8 +76,7 @@ defineProps({
                 </div>
             </header>
 
-            <!-- Page Content -->
-            <main class="flex-1 overflow-y-auto">
+            <main class="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
                 <slot />
             </main>
         </div>

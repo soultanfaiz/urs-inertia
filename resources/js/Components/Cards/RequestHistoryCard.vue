@@ -18,7 +18,7 @@ const hasHistories = computed(() => {
 </script>
 
 <template>
-    <div v-if="hasHistories" class="p-6 bg-white rounded-lg shadow">
+    <div v-if="hasHistories" class="p-4 sm:p-6 bg-white rounded-lg shadow">
         <h3 class="mb-4 text-lg font-semibold text-gray-800">Riwayat Proses</h3>
         <ul role="list" class="space-y-6">
             <HistoryItem v-for="(history, index) in appRequest.histories" :key="history.id" :history="history"

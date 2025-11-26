@@ -1,9 +1,10 @@
 <script setup>
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
-import { Head, usePage } from '@inertiajs/vue3';
+import { Head, usePage, Link } from '@inertiajs/vue3';
 import { ref, computed } from 'vue';
 import ProgressCard from '@/Components/Cards/ProgressCard.vue';
 import RequestInfoCard from '@/Components/Cards/RequestInfoCard.vue';
+import RequestHistoryCard from '@/Components/Cards/RequestHistoryCard.vue';
 import SupportingDocumentsCard from '@/Components/Cards/SupportingDocumentsCard.vue';
 import DevelopmentActivityCard from '@/Components/Cards/DevelopmentActivityCard.vue';
 import VerifyRequestModal from '@/Components/Modals/VerifyRequestModal.vue';
@@ -102,8 +103,13 @@ const latestHistoryForUpload = computed(() => {
 
     <AuthenticatedLayout>
         <template #header>
-            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                <h2 class="font-semibold text-xl text-gray-800 leading-tight">Detail Permintaan Aplikasi</h2>
+            <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+                <div>
+                    <h2 class="font-semibold text-xl text-gray-800 leading-tight">Detail Permintaan Aplikasi</h2>
+                    <Link :href="route('app-requests.index')" class="text-sm text-blue-600 hover:underline mt-1">
+                        &larr; Kembali ke Daftar
+                    </Link>
+                </div>
                 <div class="flex flex-col sm:flex-row sm:items-center gap-2 w-full sm:w-auto">
                     <button v-if="canChangeStatus" @click="showingChangeRequestStatusModal = true" type="button" class="inline-flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 w-full sm:w-auto">
                         <svg class="w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
@@ -143,6 +149,7 @@ const latestHistoryForUpload = computed(() => {
                         @open-verify-image-modal="openImageVerifyModal"
                     />
                     <DevelopmentActivityCard :app-request="appRequest" />
+                    <RequestHistoryCard :app-request="appRequest" />
                 </div>
             </div>
         </div>
