@@ -12,8 +12,8 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('development_activities', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('app_request_id')->constrained('app_requests')->onDelete('cascade');
+            $table->uuid('id')->primary();
+            $table->foreignUuid('app_request_id')->constrained('app_requests')->onDelete('cascade');
             $table->unsignedInteger('iteration_count');
             $table->text('description');
             $table->date('start_date')->nullable();

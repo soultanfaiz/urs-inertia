@@ -66,7 +66,7 @@ const deadlineTextColorClass = computed(() => {
 });
 
 const showDeadlineInfo = computed(() => {
-    return deadline.value && !['permohonan', 'selesai'].includes(props.appRequest.status);
+    return deadline.value && props.appRequest.status !== 'permohonan';
 });
 
 const formattedDeadline = computed(() => {
@@ -75,6 +75,10 @@ const formattedDeadline = computed(() => {
 
 const deadlineForHumans = computed(() => {
     return deadline.value ? formatDistanceToNow(deadline.value, { addSuffix: true, locale: id }) : '';
+});
+
+const deadlineLabel = computed(() => {
+    return props.appRequest.status === 'SELESAI' ? 'Selesai pada:' : 'Deadline:';
 });
 </script>
 
@@ -119,9 +123,9 @@ const deadlineForHumans = computed(() => {
             <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                 <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.414-1.415L11 9.586V6z" clip-rule="evenodd"></path>
             </svg>
-            <span class="font-medium">Deadline:</span>
+            <span class="font-medium">{{ deadlineLabel }}</span>
             <span class="">{{ formattedDeadline }}</span>
-            <span class="text-xs opacity-75">({{ deadlineForHumans }})</span>
+            <span v-if="appRequest.status !== 'SELESAI'" class="text-xs opacity-75">({{ deadlineForHumans }})</span>
         </div>
     </div>
 </template>

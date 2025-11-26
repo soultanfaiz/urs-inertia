@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::create('request_image_supports', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('request_history_id')->constrained('request_histories')->onDelete('cascade');
+            $table->foreignUuid('request_history_id')->constrained('request_histories')->onDelete('cascade');
             $table->string('request_status');
             $table->string('image_path');
             $table->string('image_name');

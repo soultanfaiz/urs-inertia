@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
+
 use App\Enums\VerificationStatus;
 use App\Enums\RequestStatus;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -11,7 +13,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class RequestHistory extends Model
 {
-    use HasFactory;
+    use HasUuids,HasFactory;
 
     protected $fillable = [
         'app_request_id',

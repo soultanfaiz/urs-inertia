@@ -34,7 +34,7 @@ const showingSidebar = ref(false);
 
                 <!-- PERBAIKAN 2: Tambahkan px-6 di header agar judul tidak mepet pinggir -->
                 <div class="flex items-center justify-between px-6 mb-6">
-                    <span class="text-xl font-bold text-gray-800">Admin Panel</span>
+                    <span class="text-xl font-bold text-gray-800">{{ isAdmin ? 'Admin Panel' : 'User Panel' }}</span>
 
                     <!-- Tombol Close (Hanya muncul di Mobile) -->
                     <button @click="showingSidebar = false" class="md:hidden text-gray-500 hover:text-gray-700 focus:outline-none">

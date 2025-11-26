@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::create('sub_development_activities', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('development_activity_id')->constrained('development_activities')->onDelete('cascade');
+            $table->foreignUuid('development_activity_id')->constrained('development_activities')->onDelete('cascade');
             $table->string('name');
             $table->text('description')->nullable();
             $table->boolean('is_completed')->default(false);

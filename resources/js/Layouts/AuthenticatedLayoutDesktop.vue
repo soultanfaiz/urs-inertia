@@ -20,7 +20,7 @@ defineProps({
             <div class="min-h-full flex flex-col py-4">
 
                 <div class="flex items-center mb-8 px-6">
-                    <span class="text-xl font-bold text-gray-800">Admin Panel</span>
+                    <span class="text-xl font-bold text-gray-800">{{ isAdmin ? 'Admin Panel' : 'User Panel' }}</span>
                 </div>
 
                 <nav class="flex-1">

@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::create('request_doc_supports', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('request_history_id')->constrained('request_histories')->onDelete('cascade');
+            $table->foreignUuid('request_history_id')->constrained('request_histories')->onDelete('cascade');
             $table->string('request_status');
             $table->string('file_path');
             $table->string('file_name');

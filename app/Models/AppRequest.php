@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use App\Enums\VerificationStatus;
 use App\Enums\RequestStatus;
 use App\Enums\Instansi;
@@ -12,7 +13,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class AppRequest extends Model
 {
-    use HasFactory;
+    use HasUuids,HasFactory;
 
     /**
      * The attributes that are mass assignable.
