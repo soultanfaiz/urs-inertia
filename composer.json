@@ -58,6 +58,12 @@
             "Illuminate\\Foundation\\ComposerScripts::postAutoloadDump",
             "@php artisan package:discover --ansi"
         ],
+        "post-install-cmd": [
+            "php -r \"file_exists('storage') || mkdir('storage', 0777, true);\"",
+            "php -r \"file_exists('bootstrap/cache') || mkdir('bootstrap/cache', 0777, true);\"",
+            "chmod -R 775 storage",
+            "chmod -R 775 bootstrap/cache"
+        ],
         "post-update-cmd": [
             "@php artisan vendor:publish --tag=laravel-assets --ansi --force"
         ],
