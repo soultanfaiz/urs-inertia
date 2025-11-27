@@ -50,8 +50,7 @@ class DashboardController extends Controller
         // 3. Permohonan Masuk per Bulan (dalam 12 bulan terakhir)
         $requestsOverTime = AppRequest::query()
             ->select(
-                DB::raw('DATE_FORMAT(created_at, "%Y-%m") as month'),
-                DB::raw('count(*) as total')
+                DB::raw("TO_CHAR(created_at, 'YYYY-MM') as month, count(*) as total")
             )
             ->where('created_at', '>=', now()->subYear())
             ->groupBy('month')
