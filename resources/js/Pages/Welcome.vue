@@ -43,7 +43,7 @@ const placeholderImage = '/storage/placeholder.png';
                 <nav class="flex items-center space-x-4">
                     <div v-if="canLogin">
                         <Link
-                            v-if="$page.props.auth.user"
+                            v-if="user"
                             :href="isAdmin ? route('dashboard') : route('app-requests.index')"
                             class="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md shadow-sm"
                         >
