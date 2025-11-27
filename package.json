@@ -24,7 +24,8 @@
         "@cloudinary/url-gen": "^1.22.0",
         "@cloudinary/vue": "^1.13.3",
         "chart.js": "^4.5.1",
-        "date-fns": "^4.1.0"
+        "date-fns": "^4.1.0",
+        "ziggy-js": "^2.6.0"
     },
     "name": "",
     "version": ""
