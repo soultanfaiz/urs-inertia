@@ -1,5 +1,6 @@
 <script setup>
-import { Head, Link } from '@inertiajs/vue3';
+import { Head, Link, usePage } from '@inertiajs/vue3';
+import { computed, ref } from 'vue';
 
 defineProps({
     canLogin: {
@@ -18,6 +19,11 @@ defineProps({
     },
 });
 
+const page = usePage();
+const user = computed(() => page.props.auth.user);
+// Pengecekan peran admin berdasarkan 'type' atau 'roles'
+const isAdmin = computed(() => user.value?.type === 'admin' || user.value?.roles?.some(role => role.name === 'admin'));
+
 // Placeholder for image asset. In a real Laravel app, you might construct this path differently
 // or use a dynamic import if Vite is configured for it.
 const placeholderImage = '/storage/placeholder.png';
@@ -30,7 +36,7 @@ const placeholderImage = '/storage/placeholder.png';
             <header class="flex justify-between items-center">
                 <div class="flex items-center space-x-2">
                     <Link href="/" class="text-2xl font-bold text-gray-900">
-                        Title
+                        SIPP
                     </Link>
                 </div>
 
@@ -38,7 +44,7 @@ const placeholderImage = '/storage/placeholder.png';
                     <div v-if="canLogin">
                         <Link
                             v-if="$page.props.auth.user"
-                            :href="route('dashboard')"
+                            :href="isAdmin ? route('dashboard') : route('app-requests.index')"
                             class="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md shadow-sm"
                         >
                             Dashboard
@@ -52,13 +58,13 @@ const placeholderImage = '/storage/placeholder.png';
                                 Log In
                             </Link>
 
-                            <Link
+                            <!-- <Link
                                 v-if="canRegister"
                                 :href="route('register')"
                                 class="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md shadow-sm mx-2"
                             >
                                 Sign Up
-                            </Link>
+                            </Link> -->
                         </template>
                     </div>
                 </nav>
@@ -72,22 +78,20 @@ const placeholderImage = '/storage/placeholder.png';
                         <h1
                             class="text-4xl lg:text-5xl font-extrabold tracking-tight text-gray-900"
                         >
-                            Text Text Text Text
+                            Sistem Informasi Permohonan Aplikasi
                         </h1>
                         <p class="mt-6 text-lg text-gray-600">
-                            The smartest eSignature solution for you to sign,
-                            assign & manage documents online to grow your
-                            business.
+                            Ajukan permohonan pengembangan aplikasi dan pantau perkembangannya
                         </p>
                         <div
                             class="mt-8 flex flex-col sm:flex-row justify-center lg:justify-start space-y-4 sm:space-y-0 sm:space-x-4"
                         >
-                            <a
-                                href="#"
+                            <Link
+                                :href="route('login')"
                                 class="inline-flex items-center justify-center px-8 py-3 text-base font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700"
                             >
-                                Start Now
-                            </a>
+                                Mulai Sekarang
+                            </Link>
                         </div>
                     </div>
 

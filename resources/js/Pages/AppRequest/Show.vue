@@ -99,13 +99,13 @@ const latestHistoryForUpload = computed(() => {
 </script>
 
 <template>
-    <Head title="Detail Permintaan Aplikasi" />
+    <Head title="Detail Permohonan Aplikasi" />
 
     <AuthenticatedLayout>
         <template #header>
             <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
                 <div>
-                    <h2 class="font-semibold text-xl text-gray-800 leading-tight">Detail Permintaan Aplikasi</h2>
+                    <h2 class="font-semibold text-xl text-gray-800 leading-tight">Detail Permohonan Aplikasi</h2>
                     <Link :href="route('app-requests.index')" class="text-sm text-blue-600 hover:underline mt-1">
                         &larr; Kembali ke Daftar
                     </Link>
