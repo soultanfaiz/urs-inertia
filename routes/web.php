@@ -8,6 +8,7 @@ use Illuminate\Foundation\Application;
 use App\Http\Controllers\DevelopmentActivityController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
+use Illuminate\Support\Facades\Auth;
 
 Route::get('/', function () {
     return Inertia::render('Welcome', [
@@ -15,6 +16,11 @@ Route::get('/', function () {
         'canRegister' => Route::has('register'),
         'laravelVersion' => Application::VERSION,
         'phpVersion' => PHP_VERSION,
+        'auth' => [
+            'user' => Auth::user(), // Mengirimkan data pengguna yang sedang login (jika ada)
+            // Anda juga dapat mengirimkan peran pengguna di sini jika diperlukan oleh komponen Welcome:
+            // 'roles' => Auth::user()?->getRoleNames() ?? [],
+        ],
     ]);
 });
 
@@ -70,4 +76,4 @@ Route::middleware(['auth', 'verified'])->group(function () {
 //     ]);
 // });
 
-require __DIR__.'/auth.php';
+require __DIR__ . '/auth.php';
