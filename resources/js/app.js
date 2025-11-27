@@ -13,7 +13,7 @@ createInertiaApp({
     resolve: (name) => resolvePageComponent(`./Pages/${name}.vue`, import.meta.glob('./Pages/**/*.vue')),
     setup({ el, App, props }) {
         return createApp({ render: () => h(App, props) })
-            .use(ZiggyVue, props.initialPage.props.ziggy) // Use the ZiggyVue plugin
+            // .use(ZiggyVue, props.initialPage.props.ziggy) // Use the ZiggyVue plugin
             .mount(el);
     },
 });
