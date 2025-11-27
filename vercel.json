@@ -1,0 +1,27 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "public/index.php",
+      "use": "@vercel/php"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "public/index.php"
+    }
+  ],
+  "env": {
+    "APP_ENV": "production",
+    "APP_DEBUG": "false",
+    "APP_URL": "https://sipp-pemkot-samarinda.vercel.app",
+    "APP_KEY": "base64:w2dNoZNZT8Oj0y+GZWSyeL9nmzEsPdzmbAUqNoB9W+8=",
+    "DB_CONNECTION": "mysql",
+    "DB_HOST": "",
+    "DB_PORT": "",
+    "DB_DATABASE": "",
+    "DB_USERNAME": "",
+    "DB_PASSWORD": ""
+  }
+}
