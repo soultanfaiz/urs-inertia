@@ -39,7 +39,8 @@ class AppRequestController extends Controller
         $appRequestsQuery = AppRequest::with('user')->latest();
 
         if (!auth()->user()->hasRole('admin')) {
-            $appRequestsQuery->where('user_id', auth()->id());
+            // Jika bukan admin, tampilkan semua permohonan dari instansi yang sama.
+            $appRequestsQuery->where('instansi', auth()->user()->instansi);
         }
 
         $appRequests = $appRequestsQuery->paginate(10)->withQueryString();
