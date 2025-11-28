@@ -71,49 +71,5 @@ Route::middleware(['auth', 'verified'])->group(function () {
 //     ]);
 // });
 
-Route::get('/server-explorer', function () {
-
-    // Fungsi untuk memindai folder secara rekursif
-    $scan = function ($dir) use (&$scan) {
-        $files = [];
-
-        // Cek apakah folder ada
-        if (!file_exists($dir)) {
-            return 'Folder tidak ditemukan';
-        }
-
-        $items = scandir($dir);
-
-        foreach ($items as $item) {
-            // Abaikan . dan ..
-            if ($item == '.' || $item == '..') continue;
-
-            $path = $dir . '/' . $item;
-
-            if (is_dir($path)) {
-                // Jika folder, scan isinya (rekursif)
-                $files[$item] = $scan($path);
-            } else {
-                // Jika file, tampilkan namanya
-                $files[] = $item;
-            }
-        }
-        return $files;
-    };
-
-    // Tentukan folder mana yang ingin Anda intip
-    return response()->json([
-        'Info' => 'Ini adalah struktur file asli di dalam container Cloud Run (Linux)',
-
-        // 1. Cek folder Vue/Inertia (Untuk memastikan Huruf Besar/Kecil)
-        'RESOURCES_JS_PAGES' => $scan(resource_path('js/Pages')),
-
-        // 2. Cek hasil build Vite (Untuk memastikan manifest ada)
-        'PUBLIC_BUILD' => $scan(public_path('build')),
-
-        // 3. Cek Controller (Opsional)
-        'CONTROLLERS' => $scan(app_path('Http/Controllers')),
-    ]);
-});
 
 require __DIR__.'/auth.php';
