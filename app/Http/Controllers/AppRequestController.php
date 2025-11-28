@@ -69,20 +69,30 @@ class AppRequestController extends Controller
      */
     public function store(Request $request)
     {
-        $validatedData = $request->validate([
+        $user = auth()->user();
+        $isAdmin = $user->hasRole('admin');
+
+        $rules = [
             'title' => 'required|string|max:255',
             'description' => 'required|string',
-            'instansi' => ['required', new Enum(Instansi::class)],
             'file_pdf' => 'required|file|mimes:pdf|max:2048',
-        ]);
+        ];
 
+        // Jika admin, instansi wajib diisi dari form.
+        if ($isAdmin) {
+            $rules['instansi'] = ['required', new Enum(Instansi::class)];
+        }
+
+        $validatedData = $request->validate($rules);
+
+        // Jika bukan admin, ambil instansi dari data user, abaikan input form.
+        $instansi = $isAdmin ? $validatedData['instansi'] : $user->instansi;
 
         try {
             // Upload menggunakan Library Native (bukan Facade Laravel)
             $upload = (new UploadApi())->upload($request->file('file_pdf')->getRealPath(), [
                 'folder' => 'pdfs',
                 'resource_type' => 'raw',
-                'upload_preset' => 'urs-inertia' // Opsional
             ]);
 
             // Ambil URL (Gunakan kurung siku [] karena hasilnya Array)
@@ -93,12 +103,12 @@ class AppRequestController extends Controller
         // --- SELESAI CONFIG MANUAL ---
 
         $appRequest = AppRequest::create([
-            'user_id' => auth()->id(),
+            'user_id' => $user->id,
             'title' => $validatedData['title'],
             'description' => $validatedData['description'],
             'start_date' => now(),
             'end_date' => now()->addMonth(),
-            'instansi' => $validatedData['instansi'],
+            'instansi' => $instansi,
             'file_path' => $path, // Path yang didapat dari manual upload
             'status' => RequestStatus::PERMOHONAN,
             'verification_status' => VerificationStatus::MENUNGGU,
