@@ -127,7 +127,7 @@ class AppRequestController extends Controller
      */
     public function show(AppRequest $appRequest)
     {
-        if (auth()->user()->id !== $appRequest->user_id && !auth()->user()->hasRole('admin')) {
+        if (auth()->user()->instansi !== $appRequest->instansi->value && !auth()->user()->hasRole('admin')) {
             abort(403, 'Anda tidak diizinkan untuk melihat permohonan ini.');
         }
 
@@ -205,8 +205,8 @@ class AppRequestController extends Controller
 
     public function storeDocSupport(Request $request, AppRequest $appRequest, RequestHistory $history)
     {
-        // Otorisasi: Hanya admin atau pemilik permohonan yang bisa menambahkan dokumen pendukung.
-        if (!auth()->user()->hasRole('admin') && auth()->id() !== $appRequest->user_id) {
+        // Otorisasi: Hanya admin atau user dari instansi yang sama yang bisa menambahkan dokumen pendukung.
+        if (!auth()->user()->hasRole('admin') && auth()->user()->instansi !== $appRequest->instansi->value) {
             abort(403, 'Anda tidak diizinkan menambahkan dokumen pendukung untuk permohonan ini.');
         }
 
@@ -257,8 +257,8 @@ class AppRequestController extends Controller
      */
     public function storeImageSupport(Request $request, AppRequest $appRequest, RequestHistory $history)
     {
-        // Otorisasi: Hanya admin atau pemilik permohonan yang bisa menambahkan bukti gambar.
-        if (!auth()->user()->hasRole('admin') && auth()->id() !== $appRequest->user_id) {
+        // Otorisasi: Hanya admin atau user dari instansi yang sama yang bisa menambahkan bukti gambar.
+        if (!auth()->user()->hasRole('admin') && auth()->user()->instansi !== $appRequest->instansi->value) {
             abort(403, 'Anda tidak diizinkan menambahkan bukti gambar untuk permohonan ini.');
         }
 
@@ -304,7 +304,7 @@ class AppRequestController extends Controller
      */
     public function download(AppRequest $appRequest)
     {
-        if (auth()->user()->id !== $appRequest->user_id && !auth()->user()->hasRole('admin')) {
+        if (auth()->user()->instansi !== $appRequest->instansi->value && !auth()->user()->hasRole('admin')) {
             abort(403, 'Anda tidak diizinkan mengakses file ini.');
         }
         if (!$appRequest->file_path) {
@@ -398,7 +398,7 @@ class AppRequestController extends Controller
       // 1. Otorisasi
         $appRequest = $docSupport->requestHistory->appRequest;
 
-        if (auth()->user()->id !== $appRequest->user_id && !auth()->user()->hasRole('admin')) {
+        if (auth()->user()->instansi !== $appRequest->instansi->value && !auth()->user()->hasRole('admin')) {
             abort(403, 'Anda tidak diizinkan mengakses file ini.');
         }
 
@@ -438,7 +438,7 @@ class AppRequestController extends Controller
     {
         $appRequest = $imageSupport->requestHistory->appRequest;
 
-        if (auth()->user()->id !== $appRequest->user_id && !auth()->user()->hasRole('admin')) {
+        if (auth()->user()->instansi !== $appRequest->instansi->value && !auth()->user()->hasRole('admin')) {
             abort(403, 'Anda tidak diizinkan mengakses gambar ini.');
         }
 
