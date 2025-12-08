@@ -88,9 +88,9 @@ const deadlineLabel = computed(() => {
 
             <div class="flex items-start justify-between px-1 mt-4">
                 <template v-for="(step, index) in processedSteps" :key="step.name">
-                    <div class="flex flex-col items-center text-center px-1 flex-shrink-0">
+                    <div class="flex flex-col items-center text-center px-0.5">
                         <div
-                            class="w-8 h-8 flex items-center justify-center rounded-full text-white transition-colors duration-200"
+                            class="w-7 h-7 flex items-center justify-center rounded-full text-white transition-colors duration-200"
                             :class="{
                                 'bg-green-500': step.status === 'completed',
                                 'bg-blue-500': step.status === 'current',
@@ -108,11 +108,11 @@ const deadlineLabel = computed(() => {
                     <template v-if="index < processedSteps.length - 1">
                         <div
                             v-if="index < currentStepIndex || appRequest.status === 'selesai'"
-                            class="flex-1 h-1 mt-3.5 bg-green-500 mx-1"
+                            class="flex-1 h-1 mt-3 bg-green-500 mx-1"
                         ></div>
                         <div
                             v-else
-                            class="flex-1 h-1 mt-3.5 bg-repeat-x mx-1"
+                            class="flex-1 h-1 mt-3 bg-repeat-x mx-1"
                             style="background-image: url('data:image/svg+xml,%3Csvg width=\'10\' height=\'2\' viewBox=\'0 0 10 2\' fill=\'none\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cpath d=\'M0 1H10\' stroke=\'%23D1D5DB\' stroke-width=\'2\' stroke-dasharray=\'2 3\'/%3E%3C/svg%3E');"
                         ></div>
                     </template>
