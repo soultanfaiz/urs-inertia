@@ -126,10 +126,20 @@ return [
     |
     */
 
-    'migrations' => [
-        'table' => 'migrations',
-        'update_date_on_publish' => true,
-    ],
+    'migrations' => 'migrations',
+
+    /*
+    |--------------------------------------------------------------------------
+    | Notifications Table
+    |--------------------------------------------------------------------------
+    |
+    | This table is used to store database notifications. You may specify a
+    | custom table name or model class to be used by the notification
+    | system. This is useful if you want to customize the model.
+    |
+    */
+
+    'notifications' => \App\Models\Notification::class,
 
     /*
     |--------------------------------------------------------------------------
