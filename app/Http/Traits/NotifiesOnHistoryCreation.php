@@ -2,6 +2,7 @@
 
 namespace App\Http\Traits;
 
+use App\Enums\RequestStatus;
 use App\Models\AppRequest;
 use App\Models\RequestHistory;
 use App\Models\User;
@@ -25,8 +26,9 @@ trait NotifiesOnHistoryCreation
             $title = 'Hasil Verifikasi Permohonan';
         }
 
+        $statusLabel = RequestStatus::tryFrom($history->status)?->label() ?? $history->status;
         // Buat pesan notifikasi yang deskriptif
-        $message = "Status pada permohonan '{$appRequest->title}' telah diperbarui menjadi '{$history->status->label()}'";
+        $message = "Status pada permohonan '{$appRequest->title}' telah diperbarui menjadi '{$statusLabel}'";
 
         // Dapatkan semua admin dan semua pengguna dari instansi terkait
         $usersToNotify = User::whereHas('roles', function ($query) {
