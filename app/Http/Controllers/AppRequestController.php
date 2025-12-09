@@ -17,6 +17,7 @@ use Inertia\Inertia;
 use Illuminate\Routing\Controller;
 use Cloudinary\Api\Upload\UploadApi;
 use Illuminate\Support\Str;
+use App\Http\Traits\NotifiesOnHistoryCreation;
 
 class AppRequestController extends Controller
 {
@@ -25,6 +26,8 @@ class AppRequestController extends Controller
      *
      * @return void
      */
+    use NotifiesOnHistoryCreation;
+
     public function __construct()
     {
         $this->middleware('auth');
@@ -115,10 +118,12 @@ class AppRequestController extends Controller
             'verification_status' => VerificationStatus::MENUNGGU,
         ]);
 
-        $appRequest->histories()->create([
+        $history = $appRequest->histories()->create([
             'user_id' => auth()->id(),
             'status' => RequestStatus::PERMOHONAN,
         ]);
+
+        $this->sendNotificationForHistory($appRequest, $history);
 
         return redirect()->route('app-requests.index')->with('success', 'Permohonan berhasil diajukan!');
     }
@@ -187,12 +192,14 @@ class AppRequestController extends Controller
 
             $appRequest->update($updateData);
 
-            $appRequest->histories()->create([
+            $history = $appRequest->histories()->create([
                 'user_id' => auth()->id(),
                 // Catat status progres di riwayat
                 'status' => $newStatus,
                 'reason' => $validated['reason'] ?? null,
             ]);
+
+            $this->sendNotificationForHistory($appRequest, $history);
         });
 
         // Inertia akan secara otomatis menangani redirect ini dengan benar pada request XHR (AJAX).
@@ -360,12 +367,14 @@ class AppRequestController extends Controller
             $verificationStatus = VerificationStatus::from($validated['verification_status']);
             $appRequest->verification_status = $verificationStatus;
 
-            $appRequest->histories()->create([
+            $verificationHistory = $appRequest->histories()->create([
                 'user_id' => auth()->id(),
                 'status' => $verificationStatus->value,
                 'type' => 'verification', // Tambahkan baris ini
                 'reason' => $validated['reason'] ?? null,
             ]);
+
+            $this->sendNotificationForHistory($appRequest, $verificationHistory);
 
             if ($verificationStatus === VerificationStatus::DISETUJUI) {
                 $allStatuses = RequestStatus::cases();
@@ -373,11 +382,12 @@ class AppRequestController extends Controller
                 if ($currentIndex !== false && isset($allStatuses[$currentIndex + 1])) {
                     $nextStatus = $allStatuses[$currentIndex + 1];
                     $appRequest->status = $nextStatus;
-                    $appRequest->histories()->create([
+                    $statusHistory = $appRequest->histories()->create([
                         'user_id' => auth()->id(),
                         'status' => $nextStatus->value,
                         'reason' => 'Status otomatis naik setelah verifikasi disetujui.',
                     ]);
+                    $this->sendNotificationForHistory($appRequest, $statusHistory);
                 }
             }
 

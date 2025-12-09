@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\Notification;
 use App\Enums\RequestStatus;
 use App\Enums\VerificationStatus;
 use Illuminate\Http\Request;
@@ -33,8 +34,42 @@ class HandleInertiaRequests extends Middleware
     {
         return array_merge(parent::share($request), [
             'auth' => function () use ($request) {
+                $user = $request->user()?->load('roles:name');
+
+                if (!$user) {
+                    return ['user' => null, 'notifications' => [], 'notifications_count' => 0];
+                }
+
+                // 1. Buat query awal berdasarkan peran pengguna.
+                $query = Notification::with('requestHistory.appRequest')->where('user_id', $user->id)->latest('created_at')->limit(50);
+                $allRelevantNotifications = $query->get();
+
+                // 2. Proses koleksi di PHP untuk mendapatkan `count` dan `list`.
+                $notifications_count = $allRelevantNotifications
+                    ->where('user_id', $user->id)
+                    ->where('is_read', false)
+                    ->count();
+
+                $notifications_list = $allRelevantNotifications
+                    ->take(10) // Ambil 10 teratas untuk ditampilkan
+                    ->map(function ($notification) {
+                        $appRequest = $notification->requestHistory->appRequest ?? null;
+                        if (!$appRequest) return null;
+
+                        return [
+                            'id' => $notification->id,
+                            'title' => "Update pada: " . \Illuminate\Support\Str::limit($appRequest->title, 25),
+                            'message' => $notification->message,
+                            'link' => route('app-requests.show', $appRequest->id),
+                            'created_at' => $notification->created_at,
+                            'is_read' => (bool) $notification->is_read,
+                        ];
+                    })->filter();
+
                 return [
-                    'user' => $request->user() ? $request->user()->load('roles:name') : null,
+                    'user' => $user,
+                    'notifications_count' => $notifications_count,
+                    'notifications' => $notifications_list,
                 ];
             },
             'enums' => [

@@ -4,6 +4,7 @@ use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\AppRequestController; // Tambahkan ini
 use App\Http\Controllers\SubDevelopmentActivityController;
+use App\Http\Controllers\NotificationController;
 use Illuminate\Foundation\Application;
 use App\Http\Controllers\DevelopmentActivityController;
 use Illuminate\Support\Facades\Route;
@@ -57,6 +58,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
         // Rute untuk menambahkan sub-aktivitas ke aktivitas pengembangan yang ada
         Route::post('/development-activities/{developmentActivity}/add-sub-activities', [DevelopmentActivityController::class, 'addSubActivities'])->name('development-activity.add-sub-activities');
     });
+
+    // Rute untuk Notifikasi
+    Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
+    Route::post('/notifications/{notification}/mark-as-read', [NotificationController::class, 'markAsRead'])->name('notifications.markAsRead');
+    Route::post('/notifications/mark-all-as-read', [NotificationController::class, 'markAllAsRead'])->name('notifications.markAllAsRead');
 
     // ... (Tambahkan rute custom lain di sini jika ada)
 
