@@ -26,7 +26,12 @@ trait NotifiesOnHistoryCreation
             $title = 'Hasil Verifikasi Permohonan';
         }
 
-        $statusLabel = RequestStatus::tryFrom($history->status)?->label() ?? $history->status;
+        // Dapatkan label status. Jika status sudah merupakan instance Enum, panggil label() secara langsung.
+        // Jika tidak, coba konversi dari string/int. Fallback ke nilai mentah jika gagal.
+        $statusLabel = $history->status instanceof RequestStatus
+            ? $history->status->label()
+            : (RequestStatus::tryFrom($history->status)?->label() ?? $history->status);
+
         // Buat pesan notifikasi yang deskriptif
         $message = "Status pada permohonan '{$appRequest->title}' telah diperbarui menjadi '{$statusLabel}'";
 
