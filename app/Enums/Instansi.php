@@ -29,7 +29,7 @@ enum Instansi: string
     case DKPP = 'Dinas Ketahanan Pangan dan Pertanian';
     case DISKAN = 'Dinas Perikanan';
     case DISPUSIP = 'Dinas Perpustakaan dan Kearsipan';
-    case DISDAG = "Dinas Perdagangan";
+    case DISDAG = 'Dinas Perdagangan';
 
     // Badan
     case BKPSDM = 'Badan Kepegawaian dan Pengembangan Sumber Daya Manusia';
