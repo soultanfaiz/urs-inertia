@@ -54,12 +54,7 @@ const canChangeStatus = computed(() => {
     // 1. Must be admin
     if (!isAdmin.value) return false;
 
-    // 2. Get the latest history for the current status
-    const history = latestHistoryForCurrentStatus.value;
-    if (!history || !history.doc_supports || history.doc_supports.length === 0) return false;
-
-    // 3. Check if at least one document in that history is approved
-    return history.doc_supports.some(doc => doc.verification_status === enums.value.verificationStatus.DISETUJUI);
+    return true;
 });
 
 // State for Add Modals
