@@ -18,6 +18,7 @@ use Illuminate\Routing\Controller;
 use Cloudinary\Api\Upload\UploadApi;
 use Illuminate\Support\Str;
 use App\Http\Traits\NotifiesOnHistoryCreation;
+use Barryvdh\DomPDF\Facade\Pdf;
 
 class AppRequestController extends Controller
 {
@@ -48,9 +49,17 @@ class AppRequestController extends Controller
 
         $appRequests = $appRequestsQuery->paginate(10)->withQueryString();
 
+        // Ambil semua data ringkas untuk keperluan checklist laporan (tanpa paginasi)
+        $reportQuery = AppRequest::select('id', 'title', 'instansi', 'created_at', 'status')->latest();
+        if (!auth()->user()->hasRole('admin')) {
+            $reportQuery->where('instansi', auth()->user()->instansi);
+        }
+        $allRequestsForReport = $reportQuery->get();
+
         // Render komponen Vue 'AppRequest/Index' dan kirimkan data sebagai props
         return Inertia::render('AppRequest/Index', [
             'appRequests' => $appRequests,
+            'allRequestsForReport' => $allRequestsForReport,
         ]);
     }
 
@@ -530,5 +539,35 @@ class AppRequestController extends Controller
         // Redirect kembali ke halaman detail permohonan
         return redirect()->route('app-requests.show', $imageSupport->requestHistory->appRequest)
             ->with('success', 'Status gambar pendukung berhasil diperbarui!');
+    }
+
+    /**
+     * Membuat laporan PDF berdasarkan checklist.
+     */
+    public function generateReport(Request $request)
+    {
+        $request->validate([
+            'request_ids' => 'required|array|min:1',
+            'request_ids.*' => 'exists:app_requests,id',
+        ]);
+
+        $requests = AppRequest::with([
+            'user',
+            'histories.docSupports',
+            'histories.imageSupports'
+        ])
+            ->whereIn('id', $request->request_ids)
+            ->latest()
+            ->get();
+
+        // Otorisasi tambahan: filter jika bukan admin
+        if (!auth()->user()->hasRole('admin')) {
+            $requests = $requests->filter(fn($req) => $req->instansi->value === auth()->user()->instansi);
+        }
+
+        $pdf = Pdf::loadView('reports.app_requests', ['requests' => $requests])
+            ->setPaper('a4', 'portrait')
+            ->setOptions(['isRemoteEnabled' => true]); // Penting agar gambar dari URL bisa muncul
+        return $pdf->download('Laporan_Permohonan_' . now()->format('Ymd_His') . '.pdf');
     }
 }
