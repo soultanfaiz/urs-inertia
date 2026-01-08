@@ -31,9 +31,13 @@ RUN apt-get update && apt-get install -y \
     libpq-dev \
     libzip-dev \
     libicu-dev \
+    libpng-dev \
+    libjpeg-dev \
+    libfreetype6-dev \
     unzip \
     git \
-    && docker-php-ext-install pdo pdo_pgsql bcmath intl zip opcache
+    && docker-php-ext-configure gd --with-freetype --with-jpeg \
+    && docker-php-ext-install pdo pdo_pgsql bcmath intl zip opcache gd
 
 # Aktifkan mod_rewrite
 RUN a2enmod rewrite
