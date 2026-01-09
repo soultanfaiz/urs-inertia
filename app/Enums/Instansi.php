@@ -23,7 +23,7 @@ enum Instansi: string
     case DISNAKER = 'Dinas Tenaga Kerja';
     case DISKOMINFO = 'Dinas Komunikasi, Informatika, Statistik, dan Persandian';
     case PUPR = 'Dinas Pekerjaan Umum dan Penataan Ruang';
-    case PERKIMTAN = 'Dinas Perumahan Rakyat dan Kawasan Permukiman Serta Pertanahan';
+    case PERKIM = 'Dinas Perumahan dan Kawasan Permukiman';
     case DISHUB = 'Dinas Perhubungan';
     case DLH = 'Dinas Lingkungan Hidup';
     case DKPP = 'Dinas Ketahanan Pangan dan Pertanian';
@@ -38,4 +38,24 @@ enum Instansi: string
     case BAPENDA = 'Badan Pendapatan Daerah';
     case KESBANGPOL = 'Badan Kesatuan Bangsa dan Politik';
     case BPBD = 'Badan Penanggulangan Bencana Daerah';
+
+    // Bagian Sekretariat Daerah
+    case BAGPEMERINTAHAN = 'Bagian Tata Pemerintahan';
+    case BAGUMUM = 'Bagian Umum';
+    case BAGPROTOKOL = 'Bagian Protokol dan Komunikasi Pimpinan';
+    case BAGHUKUM = 'Bagian Hukum';
+
+    case BAGKERJASAMA = 'Bagian Kerjasama';
+
+    case BAGADPEM = 'Bagian Administrasi Pembangunan';
+    case BAGKESRA = 'Bagian Kesejahteraan Rakyat';
+    case BAGORGANISASI = 'Bagian Organisasi';
+    case BAGBARJAS = 'Bagian Pengadaan Barang dan Jasa';
+    case BAGPEREKONOMIAN = 'Bagian Perekonomian';
+    case BAGRENKEU = 'Bagian Perencanaan dan Keuangan';
+    case BAGSDA= 'Bagian Sumber Daya Alam';
+
+
+
+
 }
