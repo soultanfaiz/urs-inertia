@@ -37,8 +37,27 @@ class AppRequestController extends Controller
     /**
      * Menampilkan daftar permohonan.
      */
-    public function index()
+    public function index(Request $request)
     {
+        // Helper untuk menerapkan filter pencarian dan status (agar bisa dipakai di query utama & laporan)
+        $applyFilters = function ($query) use ($request) {
+            // Filter Searching (Judul atau Nama Pemohon)
+            if ($request->filled('search')) {
+                $search = Str::lower($request->search);
+                $query->where(function ($q) use ($search) {
+                    $q->where(DB::raw('LOWER(title)'), 'like', '%' . $search . '%')
+                          ->orWhereHas('user', function ($subQ) use ($search) {
+                              $subQ->where(DB::raw('LOWER(name)'), 'like', '%' . $search . '%');
+                          });
+                });
+            }
+
+            // Filter Status
+            if ($request->filled('status')) {
+                $query->where('status', $request->status);
+            }
+        };
+
         // Ambil data permohonan berdasarkan role
         $appRequestsQuery = AppRequest::with('user')->latest();
 
@@ -47,6 +66,9 @@ class AppRequestController extends Controller
             $appRequestsQuery->where('instansi', auth()->user()->instansi);
         }
 
+        // Terapkan filter ke query utama
+        $applyFilters($appRequestsQuery);
+
         $appRequests = $appRequestsQuery->paginate(10)->withQueryString();
 
         // Ambil semua data ringkas untuk keperluan checklist laporan (tanpa paginasi)
@@ -54,12 +76,17 @@ class AppRequestController extends Controller
         if (!auth()->user()->hasRole('admin')) {
             $reportQuery->where('instansi', auth()->user()->instansi);
         }
+
+        // Terapkan filter yang sama ke query laporan
+        $applyFilters($reportQuery);
+
         $allRequestsForReport = $reportQuery->get();
 
         // Render komponen Vue 'AppRequest/Index' dan kirimkan data sebagai props
         return Inertia::render('AppRequest/Index', [
             'appRequests' => $appRequests,
             'allRequestsForReport' => $allRequestsForReport,
+            'filters' => $request->only(['search', 'status']),
         ]);
     }
 

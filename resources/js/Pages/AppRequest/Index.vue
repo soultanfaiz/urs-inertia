@@ -2,7 +2,7 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import Pagination from '@/Components/Pagination.vue'; // Assuming you have a pagination component
 import { Head, Link, usePage, router } from '@inertiajs/vue3';
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import GenerateReportModal from '@/Components/Modals/GenerateReportModal.vue';
 
 const props = defineProps({
@@ -13,6 +13,10 @@ const props = defineProps({
     allRequestsForReport: {
         type: Array,
         default: () => [],
+    },
+    filters: {
+        type: Object,
+        default: () => ({ search: '', status: '' }),
     },
 });
 
@@ -69,6 +73,34 @@ const getStatus = (request) => {
 
 const showingReportModal = ref(false);
 
+// State untuk filter
+const search = ref(props.filters?.search ?? '');
+const statusFilter = ref(props.filters?.status ?? '');
+
+// Fungsi untuk fetch data dengan filter
+const fetchData = () => {
+    router.get(route('app-requests.index'), {
+        search: search.value,
+        status: statusFilter.value
+    }, {
+        preserveState: true,
+        preserveScroll: true,
+        replace: true,
+    });
+};
+
+// Debounce sederhana untuk search agar tidak request setiap ketikan
+let timeout = null;
+watch(search, (newValue) => {
+    clearTimeout(timeout);
+    timeout = setTimeout(() => {
+        fetchData();
+    }, 300);
+});
+
+// Watch status filter (langsung request saat berubah)
+watch(statusFilter, fetchData);
+
 </script>
 
 <template>
@@ -94,6 +126,29 @@ const showingReportModal = ref(false);
                         <Link :href="route('app-requests.create')" class="inline-flex items-center justify-center px-6 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700">
                             Ajukan Permohonan
                         </Link>
+                    </div>
+                </div>
+
+                <!-- Card Filter & Pencarian -->
+                <div class="mb-6 px-4 sm:px-6 lg:px-8">
+                    <div class="bg-white p-4 shadow-sm sm:rounded-lg">
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <!-- Input Search -->
+                            <div class="md:col-span-2">
+                                <input v-model="search" type="text" placeholder="Cari berdasarkan judul atau nama pemohon..." class="w-full border-gray-300 focus:border-blue-500 focus:ring-blue-500 rounded-md shadow-sm text-sm">
+                            </div>
+                            <!-- Dropdown Status -->
+                            <div>
+                                <select v-model="statusFilter" class="w-full border-gray-300 focus:border-blue-500 focus:ring-blue-500 rounded-md shadow-sm text-sm">
+                                    <option value="">Semua Status</option>
+                                    <option value="PERMOHONAN">Permohonan</option>
+                                    <option value="URS">URS</option>
+                                    <option value="PENGEMBANGAN">Pengembangan</option>
+                                    <option value="UAT">UAT</option>
+                                    <option value="SELESAI">Selesai</option>
+                                </select>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
