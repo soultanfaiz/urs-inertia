@@ -42,7 +42,18 @@ const handleNotificationClick = (notification) => {
 
             <template #content>
                 <div class="p-2">
-                    <div class="font-bold text-gray-800 px-2 py-1">Notifikasi</div>
+                    <div class="flex items-center justify-between px-2 py-1">
+                        <span class="font-bold text-gray-800">Notifikasi</span>
+                        <Link
+                            v-if="notifications_count > 0"
+                            :href="route('notifications.markAllAsRead')"
+                            method="post"
+                            as="button"
+                            class="text-xs text-blue-600 hover:text-blue-800 hover:underline"
+                        >
+                            Tandai sudah baca semua
+                        </Link>
+                    </div>
                     <div v-if="notifications.length > 0" class="divide-y divide-gray-100">
                         <a v-for="notification in notifications" :key="notification.id" :href="notification.link"
                             @click.prevent="handleNotificationClick(notification)" :class="[
