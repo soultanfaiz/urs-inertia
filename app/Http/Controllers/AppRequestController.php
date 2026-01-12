@@ -59,7 +59,7 @@ class AppRequestController extends Controller
         };
 
         // Ambil data permohonan berdasarkan role
-        $appRequestsQuery = AppRequest::with('user')->latest();
+        $appRequestsQuery = AppRequest::with('user')->latest('updated_at');
 
         if (!auth()->user()->hasRole('admin')) {
             // Jika bukan admin, tampilkan semua permohonan dari instansi yang sama.
@@ -72,7 +72,7 @@ class AppRequestController extends Controller
         $appRequests = $appRequestsQuery->paginate(10)->withQueryString();
 
         // Ambil semua data ringkas untuk keperluan checklist laporan (tanpa paginasi)
-        $reportQuery = AppRequest::select('id', 'title', 'instansi', 'created_at', 'status')->latest();
+        $reportQuery = AppRequest::select('id', 'title', 'instansi', 'created_at', 'status')->latest('updated_at');
         if (!auth()->user()->hasRole('admin')) {
             $reportQuery->where('instansi', auth()->user()->instansi);
         }
