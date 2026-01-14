@@ -178,7 +178,8 @@ class AppRequestController extends Controller
             'histories' => function ($query) {
                 $query->orderBy('created_at', 'desc')->orderBy('id', 'desc')->with(['user', 'docSupports', 'imageSupports']);
             },
-            'developmentActivities.subActivities'
+            'developmentActivities.subActivities',
+            'supportingNotes.user' // Load relasi catatan pendukung beserta user-nya
         ]);
 
         // Untuk debugging: Cek apakah data aktivitas pengembangan berhasil dimuat.

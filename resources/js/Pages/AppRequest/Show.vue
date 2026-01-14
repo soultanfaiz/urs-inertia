@@ -6,11 +6,13 @@ import ProgressCard from '@/Components/Cards/ProgressCard.vue';
 import RequestInfoCard from '@/Components/Cards/RequestInfoCard.vue';
 import RequestHistoryCard from '@/Components/Cards/RequestHistoryCard.vue';
 import SupportingDocumentsCard from '@/Components/Cards/SupportingDocumentsCard.vue';
+import SupportingNotesCard from '@/Components/Cards/SupportingNotesCard.vue';
 import DevelopmentActivityCard from '@/Components/Cards/DevelopmentActivityCard.vue';
 import VerifyRequestModal from '@/Components/Modals/VerifyRequestModal.vue';
 import ChangeRequestStatusModal from '@/Components/Modals/ChangeRequestStatusModal.vue';
 import AddDocSupportModal from '@/Components/Modals/AddDocSupportModal.vue';
 import AddImageSupportModal from '@/Components/Modals/AddImageSupportModal.vue';
+import AddSupportingNoteModal from '@/Components/Modals/AddSupportingNoteModal.vue';
 import VerifyDocSupportModal from '@/Components/Modals/VerifyDocSupportModal.vue';
 import VerifyImageSupportModal from '@/Components/Modals/VerifyImageSupportModal.vue';
 import RejectionAlert from '@/Components/Alerts/RejectionAlert.vue';
@@ -60,6 +62,7 @@ const canChangeStatus = computed(() => {
 // State for Add Modals
 const showingAddDocSupportModal = ref(false);
 const showingAddImageSupportModal = ref(false);
+const showingAddNoteModal = ref(false);
 
 // State for Verification Modals
 const showingVerifyRequestModal = ref(false);
@@ -143,6 +146,10 @@ const latestHistoryForUpload = computed(() => {
                         @open-verify-doc-modal="openDocVerifyModal"
                         @open-verify-image-modal="openImageVerifyModal"
                     />
+                    <SupportingNotesCard
+                        :app-request="appRequest"
+                        @open-add-note-modal="showingAddNoteModal = true"
+                    />
                     <DevelopmentActivityCard :app-request="appRequest" />
                     <RequestHistoryCard :app-request="appRequest" />
                 </div>
@@ -172,6 +179,11 @@ const latestHistoryForUpload = computed(() => {
             :app-request="appRequest"
             :history="latestHistoryForUpload"
             @close="showingAddImageSupportModal = false"
+        />
+        <AddSupportingNoteModal
+            :show="showingAddNoteModal"
+            :app-request="appRequest"
+            @close="showingAddNoteModal = false"
         />
         <VerifyDocSupportModal
             :show="showingVerifyDocModal"

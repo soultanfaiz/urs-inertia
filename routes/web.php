@@ -4,6 +4,7 @@ use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\AppRequestController; // Tambahkan ini
 use App\Http\Controllers\SubDevelopmentActivityController;
+use App\Http\Controllers\SupportingNoteController;
 use App\Http\Controllers\NotificationController;
 use Illuminate\Foundation\Application;
 use App\Http\Controllers\DevelopmentActivityController;
@@ -40,7 +41,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/app-requests/image-support/{imageSupport}/view', [AppRequestController::class, 'viewImageSupport'])->name('app-request.image-support.view');
     Route::post('/app-requests/doc-support/{docSupport}/verify', [AppRequestController::class, 'verifyDocSupport'])->name('app-request.doc-support.verify');
     Route::post('/app-requests/image-support/{imageSupport}/verify', [AppRequestController::class, 'verifyImageSupport'])->name('app-request.image-support.verify');
-        Route::post('/app-requests/report', [AppRequestController::class, 'generateReport'])->name('app-requests.generate-report');
+    Route::post('/app-requests/report', [AppRequestController::class, 'generateReport'])->name('app-requests.generate-report');
 
     // Rute untuk Development Activities (Hanya Admin)
     Route::middleware('role:admin')->group(function () {
@@ -58,6 +59,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
         // Rute untuk menambahkan sub-aktivitas ke aktivitas pengembangan yang ada
         Route::post('/development-activities/{developmentActivity}/add-sub-activities', [DevelopmentActivityController::class, 'addSubActivities'])->name('development-activity.add-sub-activities');
+        Route::post('/app-requests/{appRequest}/add-note', [SupportingNoteController::class, 'store'])
+            ->name('supporting-note.store');
+
     });
 
     // Rute untuk Notifikasi

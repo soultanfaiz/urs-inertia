@@ -68,4 +68,10 @@ class AppRequest extends Model
     {
         return $this->hasMany(DevelopmentActivity::class);
     }
+
+    public function supportingNotes(): HasMany
+    {
+        return $this->hasMany(SupportingNote::class)->latest();
+    }
+
 }
