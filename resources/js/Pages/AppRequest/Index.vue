@@ -116,14 +116,14 @@ watch(statusFilter, fetchData);
         <div class="py-12">
             <div class="mx-auto max-w-7xl">
                 <!-- Tombol Ajukan Permohonan -->
-                <div class="flex items-center justify-between mb-6 px-4 sm:px-6 lg:px-8">
+                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6 px-4 sm:px-6 lg:px-8">
                     <h3 class="text-lg font-bold text-gray-800">Daftar Permohonan</h3>
-                    <div class="flex gap-2">
-                        <button @click="showingReportModal = true" type="button" class="inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                    <div class="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                        <button @click="showingReportModal = true" type="button" class="inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 w-full sm:w-auto">
                             <svg class="w-5 h-5 mr-2 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
                             Buat Laporan
                         </button>
-                        <Link :href="route('app-requests.create')" class="inline-flex items-center justify-center px-6 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700">
+                        <Link :href="route('app-requests.create')" class="inline-flex items-center justify-center px-6 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 w-full sm:w-auto">
                             Ajukan Permohonan
                         </Link>
                     </div>

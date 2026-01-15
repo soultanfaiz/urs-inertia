@@ -596,6 +596,6 @@ class AppRequestController extends Controller
         $pdf = Pdf::loadView('reports.app_requests', ['requests' => $requests])
             ->setPaper('a4', 'portrait')
             ->setOptions(['isRemoteEnabled' => true]); // Penting agar gambar dari URL bisa muncul
-        return $pdf->download('Laporan_Permohonan_' . now()->format('Ymd_His') . '.pdf');
+        return $pdf->stream('Laporan_Permohonan_' . now()->format('Ymd_His') . '.pdf');
     }
 }

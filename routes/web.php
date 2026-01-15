@@ -5,6 +5,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\AppRequestController; // Tambahkan ini
 use App\Http\Controllers\SubDevelopmentActivityController;
 use App\Http\Controllers\SupportingNoteController;
+use App\Http\Controllers\AIGeneratorController;
 use App\Http\Controllers\NotificationController;
 use Illuminate\Foundation\Application;
 use App\Http\Controllers\DevelopmentActivityController;
@@ -62,7 +63,18 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('/app-requests/{appRequest}/add-note', [SupportingNoteController::class, 'store'])
             ->name('supporting-note.store');
 
+        // Route untuk AI generate note
+        Route::post('/app-requests/{appRequest}/generate-note', [AIGeneratorController::class, 'generateNote'])
+            ->name('ai.generate-note');
+
+        Route::put('/supporting-notes/{supportingNote}', [SupportingNoteController::class, 'update'])
+            ->name('supporting-note.update');
+
     });
+
+    // Rute untuk laporan catatan pendukung (dapat diakses admin dan user terkait)
+    Route::get('/app-requests/{appRequest}/supporting-notes/report', [SupportingNoteController::class, 'generateReport'])
+        ->name('supporting-notes.generate-report');
 
     // Rute untuk Notifikasi
     Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
@@ -83,4 +95,4 @@ Route::middleware(['auth', 'verified'])->group(function () {
 // });
 
 
-require __DIR__.'/auth.php';
+require __DIR__ . '/auth.php';

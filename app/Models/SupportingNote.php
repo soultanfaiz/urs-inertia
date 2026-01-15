@@ -16,6 +16,7 @@ class SupportingNote extends Model
         'user_id',
         'title',
         'note',
+        'generated_note',
         'image_path',
     ];
 

@@ -63,6 +63,17 @@ const canChangeStatus = computed(() => {
 const showingAddDocSupportModal = ref(false);
 const showingAddImageSupportModal = ref(false);
 const showingAddNoteModal = ref(false);
+const noteToEdit = ref(null);
+
+const openAddNoteModal = () => {
+    noteToEdit.value = null;
+    showingAddNoteModal.value = true;
+};
+
+const openEditNoteModal = (note) => {
+    noteToEdit.value = note;
+    showingAddNoteModal.value = true;
+};
 
 // State for Verification Modals
 const showingVerifyRequestModal = ref(false);
@@ -148,7 +159,8 @@ const latestHistoryForUpload = computed(() => {
                     />
                     <SupportingNotesCard
                         :app-request="appRequest"
-                        @open-add-note-modal="showingAddNoteModal = true"
+                        @open-add-note-modal="openAddNoteModal"
+                        @open-edit-note-modal="openEditNoteModal"
                     />
                     <DevelopmentActivityCard :app-request="appRequest" />
                     <RequestHistoryCard :app-request="appRequest" />
@@ -183,6 +195,7 @@ const latestHistoryForUpload = computed(() => {
         <AddSupportingNoteModal
             :show="showingAddNoteModal"
             :app-request="appRequest"
+            :note-to-edit="noteToEdit"
             @close="showingAddNoteModal = false"
         />
         <VerifyDocSupportModal
