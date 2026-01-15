@@ -36,6 +36,20 @@ const allDocs = computed(() => {
     if (!verificationStatusEnum) return [];
 
     const docs = props.appRequest.histories?.flatMap(h => h.doc_supports) ?? [];
+    
+    // Add main AppRequest document if exists
+    if (props.appRequest.file_path) {
+        docs.push({
+            id: 'main-doc',
+            file_name: 'Dokumen Utama Permohonan',
+            file_path: props.appRequest.file_path,
+            verification_status: props.appRequest.verification_status,
+            request_status: 'Permohonan Awal', // Group label
+            created_at: props.appRequest.created_at,
+            is_main: true
+        });
+    }
+
     return docs.filter(doc =>
         doc.verification_status === verificationStatusEnum.MENUNGGU ||
         doc.verification_status === verificationStatusEnum.DISETUJUI
@@ -130,10 +144,10 @@ const getVerificationStatusClass = (status) => {
                                 </div>
                                 <!-- Right Side: Actions -->
                                 <div class="flex items-center self-end flex-shrink-0 space-x-2 sm:self-center">
-                                    <button v-if="isAdmin && doc.verification_status === enums.verificationStatus.MENUNGGU" @click="emit('open-verify-doc-modal', doc)" type="button" class="inline-flex items-center px-2.5 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded shadow-sm hover:bg-gray-50" title="Verifikasi Dokumen">
+                                    <button v-if="isAdmin && doc.verification_status === enums.verificationStatus.MENUNGGU && !doc.is_main" @click="emit('open-verify-doc-modal', doc)" type="button" class="inline-flex items-center px-2.5 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded shadow-sm hover:bg-gray-50" title="Verifikasi Dokumen">
                                         Verifikasi
                                     </button>
-                                    <a :href="route('app-request.doc-support.download', doc.id)" target="_blank" class="text-blue-600 hover:text-blue-800" title="Unduh Dokumen">
+                                    <a :href="doc.is_main ? route('app-requests.download', appRequest.id) : route('app-request.doc-support.download', doc.id)" target="_blank" class="text-blue-600 hover:text-blue-800" title="Unduh Dokumen">
                                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
                                     </a>
                                 </div>
