@@ -161,6 +161,9 @@
         .note-content {
             font-size: 11pt;
             line-height: 1.6;
+            padding-left: 30px;
+            /* Tambahkan indentasi kiri */
+            padding-right: 30px;
         }
 
         .note-content h1,
@@ -336,32 +339,31 @@
             </tr>
             <tr>
                 <td class="label">Waktu</td>
-                <td class="value">{{ $appRequest->start_date ? $appRequest->start_date->format('H:i') : '-' }} WITA s/d
-                    Selesai</td>
+                <td class="value">{{ $metadata->time_display }}</td>
                 <td class="right-section">Diperiksa oleh :</td>
                 <td class="right-value"></td>
             </tr>
             <tr>
                 <td class="label">Pimpinan / Moderator</td>
-                <td class="value">{{ $metadata->leader ?? '-' }}</td>
+                <td class="value">{{ $metadata->leader }}</td>
                 <td class="right-section">Disetujui oleh :</td>
                 <td class="right-value"></td>
             </tr>
             <tr>
                 <td class="label">Narasumber</td>
-                <td class="value">{{ $metadata->speakers ?? '-' }}</td>
+                <td class="value">{{ $metadata->speakers }}</td>
                 <td class="right-section">Tanggal :</td>
                 <td class="right-value">{{ now()->translatedFormat('d F Y') }}</td>
             </tr>
             <tr>
                 <td class="label">Tempat</td>
-                <td class="value">{{ $metadata->place ?? '-' }}</td>
+                <td class="value">{{ $metadata->place }}</td>
                 <td class="right-section">Tanda tangan</td>
                 <td class="right-value"></td>
             </tr>
             <tr>
                 <td class="label">Peserta</td>
-                <td class="value" colspan="3">{{ $metadata->participants ?? '-' }}</td>
+                <td class="value" colspan="3">{{ $metadata->participants }}</td>
             </tr>
         </table>
 

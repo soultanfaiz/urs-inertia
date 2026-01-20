@@ -114,55 +114,52 @@ class SupportingNoteController extends Controller
         $appRequest->load(['user', 'supportingNotes.user']);
         $notes = $appRequest->supportingNotes->sortByDesc('created_at');
 
-        // Default metadata
+        // Default metadata (strings kosong agar tidak muncul di laporan jika kosong)
         $metadata = [
-            'leader' => '-',
-            'speakers' => '-',
-            'place' => '-',
-            'participants' => '-',
+            'leader' => '',
+            'speakers' => '',
+            'place' => '',
+            'participants' => '',
+            'time' => '',
         ];
 
         // Attempt to fill metadata using AI if notes exist
         if ($notes->isNotEmpty()) {
-            try {
-                $notesText = $notes->map(function ($note) {
-                    return "Judul: {$note->title}\nIsi: " . strip_tags($note->note);
-                })->join("\n\n");
+            $extracted = app(AIGeneratorController::class)->extractMetadataFromNotes($notes);
+            // Filter null values
+            $extracted = array_filter($extracted, function ($value) {
+                return !is_null($value) && $value !== '-';
+            });
+            $metadata = array_merge($metadata, $extracted);
+        }
 
-                $systemPrompt = "Anda adalah asisten administratif. Tugas Anda adalah mengekstrak informasi detail dari notulen rapat.";
-                $userPrompt = "Analisis catatan rapat berikut dan ekstrak informasi metadata secara akurat.\n\n" .
-                    "Catatan:\n{$notesText}\n\n" .
-                    "Instruksi:\n" .
-                    "Ekstrak data berikut dalam format JSON MURNI (tanpa markdown ```json):\n" .
-                    "- leader: Nama Pimpinan Rapat (jika tidak ditemukan return '-')\n" .
-                    "- speakers: Nama Narasumber (jika tidak ditemukan return '-')\n" .
-                    "- place: Tempat Pelaksanaan (jika tidak ditemukan return '-')\n" .
-                    "- participants: Daftar Peserta/Hadirin (string dipisahkan koma, jika tidak ditemukan return '-')\n\n" .
-                    "Contoh JSON:\n" .
-                    "{\"leader\": \"Budi\", \"speakers\": \"Dr. Siti\", \"place\": \"Ruang Rapat 1\", \"participants\": \"Andi, Joko, Rina\"}";
+        // Determine Final Time Display
+        $finalTime = '';
+        if (!empty($metadata['time'])) {
+            $finalTime = $metadata['time'] . ' WITA';
+        } elseif ($appRequest->start_date) {
+            $timeStr = $appRequest->start_date->format('H:i');
+            if ($timeStr !== '00:00') {
+                $finalTime = $timeStr . ' WITA s/d Selesai';
+            }
+        }
+        $metadata['time_display'] = $finalTime;
 
-                // Limit text length to avoid token limits if necessary (approx 10k chars)
-                $userPrompt = substr($userPrompt, 0, 12000);
+        // Process notes to replace placeholders with dynamic data
+        $replacements = [
+            '[HARI_TANGGAL]' => $appRequest->start_date ? $appRequest->start_date->translatedFormat('l, d F Y') : '-',
+            '[WAKTU]' => $metadata['time_display'] ?: '-', // Fallback to dash or keep empty? User said "kosongkan saja" for table, but usually placeholders in text might need content. Assuming empty is fine if "kosongkan saja" applies generally.
+            '[TEMPAT]' => !empty($metadata['place']) ? $metadata['place'] : ($appRequest->place ?? ''),
+            '[ACARA]' => $appRequest->title,
+            '[PIMPINAN]' => !empty($metadata['leader']) ? $metadata['leader'] : '',
+        ];
 
-                $aiResult = $this->openRouter->generate($systemPrompt, $userPrompt);
-
-                if ($aiResult['success']) {
-                    $jsonStr = $aiResult['data'];
-                    // Remove code blocks if present
-                    if (strpos($jsonStr, '```') !== false) {
-                        $jsonStr = preg_replace('/^```json\s*|\s*```$/s', '', $jsonStr);
-                        // Also handle simple code blocks without language
-                        $jsonStr = preg_replace('/^```\s*|\s*```$/s', '', $jsonStr);
-                    }
-
-                    $data = json_decode(trim($jsonStr), true);
-
-                    if (json_last_error() === JSON_ERROR_NONE && is_array($data)) {
-                        $metadata = array_merge($metadata, array_intersect_key($data, $metadata));
-                    }
+        // We iterate and modify the note content purely for display in the PDF
+        foreach ($notes as $note) {
+            foreach ($replacements as $placeholder => $value) {
+                if (strpos($note->note, $placeholder) !== false) {
+                    $note->note = str_replace($placeholder, $value, $note->note);
                 }
-            } catch (\Exception $e) {
-                // Silent fail, just use defaults
             }
         }
 
@@ -173,10 +170,10 @@ class SupportingNoteController extends Controller
         ])
             ->setPaper('a4', 'portrait')
             ->setOptions([
-                    'isRemoteEnabled' => true,
-                    'isHtml5ParserEnabled' => true,
-                    'chroot' => public_path(),
-                ]);
+                'isRemoteEnabled' => true,
+                'isHtml5ParserEnabled' => true,
+                'chroot' => public_path(),
+            ]);
 
         return $pdf->stream('Catatan_Pendukung_' . str_replace([' ', '/'], '_', $appRequest->title) . '_' . now()->format('Ymd_His') . '.pdf');
     }

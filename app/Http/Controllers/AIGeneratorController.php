@@ -64,51 +64,108 @@ class AIGeneratorController extends Controller
      */
     private function buildPrompt(AppRequest $appRequest, string $title, string $context, string $existingNote = ''): string
     {
-        // If existing note is provided, enhance/rewrite it
+        // Strict formatting instructions matching notulen_kegiatan.blade.php styles
+        $formatInstructions = "INSTRUKSI FORMATTING (SANGAT PENTING):\n";
+        $formatInstructions .= "1. JANGAN MENAMBAH INFORMASI BARU. Hanya format ulang teks yang diberikan.\n";
+        $formatInstructions .= "2. Gunakan tag HTML berikut agar sesuai dengan tampilan laporan:\n";
+        $formatInstructions .= "   - <h4>Judul Bagian</h4> untuk sub-judul\n";
+        $formatInstructions .= "   - <p>Paragraf teks...</p> untuk isi teks\n";
+        $formatInstructions .= "   - <ul><li>Poin list...</li></ul> untuk daftar poin\n";
+        $formatInstructions .= "   - <ol><li>Urutan langkah...</li></ol> untuk daftar urutan\n";
+        $formatInstructions .= "3. Jangan gunakan tag <h1>, <h2>, atau <h3>.\n";
+        $formatInstructions .= "4. Gunakan 'Placeholder' berikut untuk data dinamis (JANGAN UBAH):\n";
+        $formatInstructions .= "   - [HARI_TANGGAL] : untuk hari dan tanggal kegiatan\n";
+        $formatInstructions .= "   - [WAKTU] : untuk jam pelaksanaan\n";
+        $formatInstructions .= "   - [TEMPAT] : untuk lokasi rapat\n";
+        $formatInstructions .= "   - [ACARA] : untuk judul acara/kegiatan\n";
+        $formatInstructions .= "   - [PIMPINAN] : untuk nama pimpinan rapat\n";
+        $formatInstructions .= "5. Rapikan tata bahasa dan ejaan tanpa mengubah makna.\n";
+
+        // If existing note is provided, just format it
         if (!empty(trim($existingNote))) {
-            $prompt = "Berdasarkan catatan berikut, buatkan notulen rapat yang lebih lengkap dan terstruktur.\n\n";
-            $prompt .= "Judul: \"{$title}\"\n\n";
-            $prompt .= "Catatan yang sudah ada:\n";
-            $prompt .= "---\n{$existingNote}\n---\n\n";
-            $prompt .= "Konteks Permohonan:\n";
-            $prompt .= "- Judul Permohonan: {$appRequest->title}\n";
-            $prompt .= "- Instansi: {$appRequest->instansi->value}\n";
+            $prompt = "Tugas: Format ulang catatan berikut agar rapi dan profesional untuk laporan notulen.\n\n";
+            $prompt .= $formatInstructions . "\n\n";
+            $prompt .= "TEKS UNTUK DIFORMAT:\n";
+            $prompt .= "---\n{$existingNote}\n---\n";
 
             if (!empty($context)) {
-                $prompt .= "\nInformasi Tambahan:\n{$context}\n";
+                $prompt .= "\n(Gunakan konteks ini HANYA jika teks asli tidak lengkap/ambigu: {$context})\n";
             }
-
-            $prompt .= "\nTugas:\n";
-            $prompt .= "1. Perbaiki dan lengkapi catatan di atas menjadi notulen yang profesional\n";
-            $prompt .= "2. Pertahankan informasi penting dari catatan asli\n";
-            $prompt .= "3. Tambahkan struktur yang jelas (Pembukaan, Pembahasan, Kesimpulan, Tindak Lanjut)\n";
-            $prompt .= "4. Gunakan bahasa Indonesia yang formal dan profesional\n";
 
             return $prompt;
         }
 
-        // Generate new note from scratch
-        $prompt = "Buatkan notulen atau catatan rapat dengan judul: \"{$title}\"\n\n";
-        $prompt .= "Konteks Permohonan:\n";
-        $prompt .= "- Judul Permohonan: {$appRequest->title}\n";
+        // Generate new note from scratch (Drafting phase)
+        // Even for new notes, we want it concise and structured
+        $prompt = "Buatkan kerangka notulen rapat yang singkat dan padat untuk:\n";
+        $prompt .= "Judul: \"{$title}\"\n\n";
+        $prompt .= "Konteks:\n";
+        $prompt .= "- Permohonan: {$appRequest->title}\n";
         $prompt .= "- Deskripsi: {$appRequest->description}\n";
-        $prompt .= "- Instansi: {$appRequest->instansi->value}\n";
-
-        if ($appRequest->start_date) {
-            $prompt .= "- Tanggal Mulai: " . $appRequest->start_date->translatedFormat('d F Y') . "\n";
-        }
 
         if (!empty($context)) {
-            $prompt .= "\nInformasi Tambahan:\n{$context}\n";
+            $prompt .= "- Info Tambahan: {$context}\n";
         }
 
-        $prompt .= "\nBuatkan notulen yang mencakup:\n";
-        $prompt .= "1. Pembukaan\n";
-        $prompt .= "2. Pembahasan dan Diskusi\n";
-        $prompt .= "3. Kesimpulan/Hasil\n";
-        $prompt .= "4. Tindak Lanjut (jika relevan)\n";
-        $prompt .= "\nGunakan format yang jelas dan profesional. Gunakan bullet points atau numbered lists jika diperlukan.";
+        $prompt .= "\n" . $formatInstructions;
+        $prompt .= "\nBuatkan poin-poin pembahasan utama saja. Jangan bertele-tele.";
 
         return $prompt;
+    }
+
+    /**
+     * Extract metadata from notes for report generation.
+     *
+     * @param \Illuminate\Support\Collection $notes
+     * @return array
+     */
+    public function extractMetadataFromNotes($notes)
+    {
+        if ($notes->isEmpty()) {
+            return [];
+        }
+
+        $notesText = $notes->map(function ($note) {
+            return "Judul: {$note->title}\nIsi: " . strip_tags($note->note);
+        })->join("\n\n");
+
+        $systemPrompt = "Anda adalah asisten administratif. Tugas Anda adalah mengekstrak informasi detail dari notulen rapat.";
+        $userPrompt = "Analisis catatan rapat berikut dan ekstrak informasi metadata secara akurat.\n\n" .
+            "Catatan:\n{$notesText}\n\n" .
+            "Instruksi:\n" .
+            "Ekstrak data berikut dalam format JSON MURNI (tanpa markdown ```json):\n" .
+            "- leader: Nama Pimpinan Rapat (jika tidak ditemukan return null)\n" .
+            "- speakers: Nama Narasumber (jika tidak ditemukan return null)\n" .
+            "- place: Tempat Pelaksanaan (jika tidak ditemukan return null)\n" .
+            "- time: Waktu Pelaksanaan (format HH:mm, jika tidak ditemukan return null)\n" .
+            "- participants: Daftar Peserta/Hadirin (string dipisahkan koma, jika tidak ditemukan return null)\n\n" .
+            "Contoh JSON:\n" .
+            "{\"leader\": \"Budi\", \"speakers\": \"Dr. Siti\", \"place\": \"Ruang Rapat 1\", \"time\": \"14:00\", \"participants\": \"Andi, Joko, Rina\"}";
+
+        // Limit text length to avoid token limits if necessary (approx 12k chars)
+        $userPrompt = substr($userPrompt, 0, 12000);
+
+        try {
+            $aiResult = $this->openRouter->generate($systemPrompt, $userPrompt);
+
+            if ($aiResult['success']) {
+                $jsonStr = $aiResult['data'];
+                // Remove code blocks if present
+                if (strpos($jsonStr, '```') !== false) {
+                    $jsonStr = preg_replace('/^```json\s*|\s*```$/s', '', $jsonStr);
+                    $jsonStr = preg_replace('/^```\s*|\s*```$/s', '', $jsonStr);
+                }
+
+                $data = json_decode(trim($jsonStr), true);
+
+                if (json_last_error() === JSON_ERROR_NONE && is_array($data)) {
+                    return $data;
+                }
+            }
+        } catch (\Exception $e) {
+            // Log error or just return empty
+        }
+
+        return [];
     }
 }
