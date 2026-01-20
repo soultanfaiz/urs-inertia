@@ -70,6 +70,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::put('/supporting-notes/{supportingNote}', [SupportingNoteController::class, 'update'])
             ->name('supporting-note.update');
 
+        Route::delete('/supporting-notes/{supportingNote}', [SupportingNoteController::class, 'destroy'])
+            ->name('supporting-note.destroy');
+
     });
 
     // Rute untuk laporan catatan pendukung (dapat diakses admin dan user terkait)

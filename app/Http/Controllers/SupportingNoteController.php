@@ -100,6 +100,21 @@ class SupportingNoteController extends Controller
     }
 
     /**
+     * Menghapus catatan pendukung.
+     */
+    public function destroy(SupportingNote $supportingNote)
+    {
+        // Otorisasi: Hanya admin yang bisa menghapus catatan
+        if (!auth()->user()->hasRole('admin')) {
+            abort(403, 'Hanya admin yang dapat menghapus catatan.');
+        }
+
+        $supportingNote->delete();
+
+        return redirect()->back()->with('success', 'Catatan berhasil dihapus.');
+    }
+
+    /**
      * Membuat laporan PDF untuk catatan pendukung.
      */
     public function generateReport(AppRequest $appRequest)
