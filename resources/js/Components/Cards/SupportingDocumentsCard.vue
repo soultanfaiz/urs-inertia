@@ -41,7 +41,7 @@ const allDocs = computed(() => {
     if (props.appRequest.file_path) {
         docs.push({
             id: 'main-doc',
-            file_name: 'Dokumen Utama Permohonan',
+            file_name: props.appRequest.title + '.pdf', // Use request title as filename
             file_path: props.appRequest.file_path,
             verification_status: props.appRequest.verification_status,
             request_status: 'Permohonan Awal', // Group label
