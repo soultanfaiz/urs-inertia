@@ -55,7 +55,8 @@ class HandleInertiaRequests extends Middleware
                     ->take(10) // Ambil 10 teratas untuk ditampilkan
                     ->map(function ($notification) {
                         $appRequest = $notification->requestHistory->appRequest ?? null;
-                        if (!$appRequest) return null;
+                        if (!$appRequest)
+                            return null;
 
                         return [
                             'id' => $notification->id,
@@ -79,6 +80,9 @@ class HandleInertiaRequests extends Middleware
                 })->all(),
                 'requestStatus' => collect(RequestStatus::cases())->mapWithKeys(function ($case) {
                     return [$case->name => $case->value];
+                })->all(),
+                'requestStatusLabels' => collect(RequestStatus::cases())->mapWithKeys(function ($case) {
+                    return [$case->value => $case->label()];
                 })->all(),
             ],
         ]);

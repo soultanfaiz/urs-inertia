@@ -28,10 +28,9 @@ const enums = computed(() => usePage().props.enums);
 const allStatuses = computed(() => Object.values(enums.value.requestStatus));
 
 // Get the label for a given status value
+// Get the label for a given status value
 const getStatusLabel = (statusValue) => {
-    const entry = Object.entries(enums.value.requestStatus).find(([key, value]) => value === statusValue);
-    // Capitalize the first letter of the key
-    return entry ? entry[0].charAt(0).toUpperCase() + entry[0].slice(1).toLowerCase() : '';
+    return enums.value.requestStatusLabels?.[statusValue] || statusValue;
 };
 
 // --- Form Handling ---

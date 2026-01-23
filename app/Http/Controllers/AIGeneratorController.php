@@ -137,10 +137,11 @@ class AIGeneratorController extends Controller
             "- leader: Nama Pimpinan Rapat (jika tidak ditemukan return null)\n" .
             "- speakers: Nama Narasumber (jika tidak ditemukan return null)\n" .
             "- place: Tempat Pelaksanaan (jika tidak ditemukan return null)\n" .
+            "- date: Tanggal Pelaksanaan (format YYYY-MM-DD, jika tidak ditemukan return null)\n" .
             "- time: Waktu Pelaksanaan (format HH:mm, jika tidak ditemukan return null)\n" .
             "- participants: Daftar Peserta/Hadirin (string dipisahkan koma, jika tidak ditemukan return null)\n\n" .
             "Contoh JSON:\n" .
-            "{\"leader\": \"Budi\", \"speakers\": \"Dr. Siti\", \"place\": \"Ruang Rapat 1\", \"time\": \"14:00\", \"participants\": \"Andi, Joko, Rina\"}";
+            "{\"leader\": \"Budi\", \"speakers\": \"Dr. Siti\", \"place\": \"Ruang Rapat 1\", \"date\": \"2026-01-22\", \"time\": \"14:00\", \"participants\": \"Andi, Joko, Rina\"}";
 
         // Limit text length to avoid token limits if necessary (approx 12k chars)
         $userPrompt = substr($userPrompt, 0, 12000);

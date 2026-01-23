@@ -1,37 +1,117 @@
 <!DOCTYPE html>
 <html>
+
 <head>
     <title>Laporan Detail Permohonan</title>
     <style>
-        body { font-family: sans-serif; font-size: 12px; color: #333; }
-        .header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid #333; padding-bottom: 10px; }
-        .header h2 { margin: 0; font-size: 18px; }
-        .header p { margin: 5px 0 0; }
+        body {
+            font-family: sans-serif;
+            font-size: 12px;
+            color: #333;
+        }
 
-        table { width: 100%; border-collapse: collapse; margin-bottom: 10px; }
-        th, td { border: 1px solid #ccc; padding: 6px; text-align: left; vertical-align: top; }
-        th { background-color: #f4f4f4; font-weight: bold; }
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #333;
+            padding-bottom: 10px;
+        }
 
-        .section-title { background-color: #eee; padding: 5px; font-weight: bold; margin-top: 15px; margin-bottom: 5px; border-left: 4px solid #333; }
+        .header h2 {
+            margin: 0;
+            font-size: 18px;
+        }
 
-        .page-break { page-break-after: always; }
-        .no-border td { border: none; padding: 2px 5px; }
+        .header p {
+            margin: 5px 0 0;
+        }
 
-        .image-gallery { margin-top: 10px; }
-        .image-item { display: inline-block; margin-right: 10px; margin-bottom: 10px; vertical-align: top; text-align: center; width: 150px; }
-        .image-item img { max-width: 100%; max-height: 150px; border: 1px solid #ddd; }
-        .image-caption { font-size: 10px; color: #666; margin-top: 2px; display: block; word-wrap: break-word; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 10px;
+        }
 
-        .doc-list { list-style-type: none; padding: 0; }
-        .doc-list li { margin-bottom: 4px; }
-        .doc-link { color: #0066cc; text-decoration: none; }
+        th,
+        td {
+            border: 1px solid #ccc;
+            padding: 6px;
+            text-align: left;
+            vertical-align: top;
+        }
+
+        th {
+            background-color: #f4f4f4;
+            font-weight: bold;
+        }
+
+        .section-title {
+            background-color: #eee;
+            padding: 5px;
+            font-weight: bold;
+            margin-top: 15px;
+            margin-bottom: 5px;
+            border-left: 4px solid #333;
+        }
+
+        .page-break {
+            page-break-after: always;
+        }
+
+        .no-border td {
+            border: none;
+            padding: 2px 5px;
+        }
+
+        .image-gallery {
+            margin-top: 10px;
+        }
+
+        .image-item {
+            display: inline-block;
+            margin-right: 10px;
+            margin-bottom: 10px;
+            vertical-align: top;
+            text-align: center;
+            width: 150px;
+        }
+
+        .image-item img {
+            max-width: 100%;
+            max-height: 150px;
+            border: 1px solid #ddd;
+        }
+
+        .image-caption {
+            font-size: 10px;
+            color: #666;
+            margin-top: 2px;
+            display: block;
+            word-wrap: break-word;
+        }
+
+        .doc-list {
+            list-style-type: none;
+            padding: 0;
+        }
+
+        .doc-list li {
+            margin-bottom: 4px;
+        }
+
+        .doc-link {
+            color: #0066cc;
+            text-decoration: none;
+        }
     </style>
 </head>
+
 <body>
     <div class="header">
         <h2>Laporan Detail Permohonan Aplikasi</h2>
         <p>Sistem Informasi Permohonan Aplikasi Internal Samarinda</p>
-        <p style="font-size: 10px; margin-top: 5px;">Dicetak pada: {{ now()->format('d F Y H:i') }} | Oleh: {{ auth()->user()->name }}</p>
+        <p style="font-size: 10px; margin-top: 5px;">Dicetak pada: {{ now()->format('d F Y H:i') }} | Oleh:
+            {{ auth()->user()->name }}</p>
     </div>
 
     <!-- Ringkasan (Summary Table) -->
@@ -48,13 +128,13 @@
         </thead>
         <tbody>
             @foreach($requests as $index => $req)
-            <tr>
-                <td style="text-align: center">{{ $index + 1 }}</td>
-                <td>{{ $req->title }}</td>
-                <td>{{ $req->instansi }}</td>
-                <td>{{ $req->created_at->format('d/m/Y') }}</td>
-                <td>{{ ucfirst(strtolower($req->status->value)) }}</td>
-            </tr>
+                <tr>
+                    <td style="text-align: center">{{ $index + 1 }}</td>
+                    <td>{{ $req->title }}</td>
+                    <td>{{ $req->instansi }}</td>
+                    <td>{{ $req->created_at->format('d/m/Y') }}</td>
+                    <td>{{ $req->status->label() }}</td>
+                </tr>
             @endforeach
         </tbody>
     </table>
@@ -77,11 +157,11 @@
                     <td style="font-weight: bold;">Tanggal Masuk</td>
                     <td>: {{ $req->created_at->format('d F Y') }}</td>
                     <td style="font-weight: bold;">Status Saat Ini</td>
-                    <td>: {{ ucfirst(strtolower($req->status->value)) }}</td>
+                    <td>: {{ $req->status->label() }}</td>
                 </tr>
                 <tr>
                     <td style="font-weight: bold;">Verifikasi</td>
-                    <td>: {{ ucfirst(strtolower($req->verification_status->value)) }}</td>
+                    <td>: {{ $req->verification_status->label() }}</td>
                     <td style="font-weight: bold;">Estimasi Selesai</td>
                     <td>: {{ $req->end_date ? \Carbon\Carbon::parse($req->end_date)->format('d F Y') : '-' }}</td>
                 </tr>
@@ -108,8 +188,9 @@
                 @if($history->docSupports->isNotEmpty() || $history->imageSupports->isNotEmpty())
                     <div style="margin-bottom: 15px; border-bottom: 1px dashed #ccc; padding-bottom: 10px;">
                         <p style="font-weight: bold; margin-bottom: 5px;">
-                            Tahap: {{ ucfirst(strtolower($history->status)) }}
-                            <span style="font-weight: normal; font-size: 11px; color: #666;">({{ $history->created_at->format('d/m/Y H:i') }})</span>
+                            Tahap: {{ $history->status_label }}
+                            <span
+                                style="font-weight: normal; font-size: 11px; color: #666;">({{ $history->created_at->format('d/m/Y H:i') }})</span>
                         </p>
 
                         <!-- Gambar -->
@@ -132,7 +213,7 @@
                                         <a href="{{ $doc->file_path }}" target="_blank" class="doc-link">
                                             [PDF] {{ $doc->file_name }}
                                         </a>
-                                        <span style="font-size: 10px; color: #666;">({{ ucfirst(strtolower($doc->verification_status->value)) }})</span>
+                                        <span style="font-size: 10px; color: #666;">({{ $doc->verification_status->label() }})</span>
                                     </li>
                                 @endforeach
                             </ul>
@@ -145,4 +226,5 @@
         </div>
     @endforeach
 </body>
+
 </html>

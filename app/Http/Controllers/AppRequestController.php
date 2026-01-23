@@ -46,9 +46,9 @@ class AppRequestController extends Controller
                 $search = Str::lower($request->search);
                 $query->where(function ($q) use ($search) {
                     $q->where(DB::raw('LOWER(title)'), 'like', '%' . $search . '%')
-                          ->orWhereHas('user', function ($subQ) use ($search) {
-                              $subQ->where(DB::raw('LOWER(name)'), 'like', '%' . $search . '%');
-                          });
+                        ->orWhereHas('user', function ($subQ) use ($search) {
+                            $subQ->where(DB::raw('LOWER(name)'), 'like', '%' . $search . '%');
+                        });
                 });
             }
 
@@ -150,6 +150,7 @@ class AppRequestController extends Controller
             'end_date' => now()->addMonth(),
             'instansi' => $instansi,
             'file_path' => $path, // Path yang didapat dari manual upload
+            'file_name' => $request->file('file_pdf')->getClientOriginalName(),
             'status' => RequestStatus::PERMOHONAN,
             'verification_status' => VerificationStatus::MENUNGGU,
         ]);
@@ -358,32 +359,32 @@ class AppRequestController extends Controller
 
         $url = $appRequest->file_path;
 
-    // Cek safety: Jika URL kosong
-    if (empty($url)) {
-        abort(404, 'Link file tidak ditemukan di database.');
-    }
+        // Cek safety: Jika URL kosong
+        if (empty($url)) {
+            abort(404, 'Link file tidak ditemukan di database.');
+        }
 
- $response = Http::withoutVerifying()->get($url);
+        $response = Http::withoutVerifying()->get($url);
 
-    if ($response->failed()) {
-        // Jika error, kita tampilkan pesan debug biar tahu kenapa
-        return response()->json([
-            'message' => 'Gagal mengambil file dari Cloudinary',
-            'status' => $response->status(),
-            'target_url' => $url // Kita cek URL apa yang sebenarnya diakses
-        ], 404);
-    }
+        if ($response->failed()) {
+            // Jika error, kita tampilkan pesan debug biar tahu kenapa
+            return response()->json([
+                'message' => 'Gagal mengambil file dari Cloudinary',
+                'status' => $response->status(),
+                'target_url' => $url // Kita cek URL apa yang sebenarnya diakses
+            ], 404);
+        }
 
 
-    // 4. Buat Nama File yang Bagus
-    $filename = 'Dokumen_' . str_replace([' ', '/'], '_', $appRequest->title ?? 'download') . '.pdf';
+        // 4. Buat Nama File yang Bagus
+        $filename = 'Dokumen_' . str_replace([' ', '/'], '_', $appRequest->title ?? 'download') . '.pdf';
 
-    // 5. Kirim ke Browser User
-    return response()->streamDownload(function () use ($response) {
-        echo $response->body();
-    }, $filename, [
-        'Content-Type' => 'application/pdf',
-    ]);
+        // 5. Kirim ke Browser User
+        return response()->streamDownload(function () use ($response) {
+            echo $response->body();
+        }, $filename, [
+            'Content-Type' => 'application/pdf',
+        ]);
     }
 
     /**
@@ -443,7 +444,7 @@ class AppRequestController extends Controller
      */
     public function downloadDocSupport(RequestDocSupport $docSupport)
     {
-      // 1. Otorisasi
+        // 1. Otorisasi
         $appRequest = $docSupport->requestHistory->appRequest;
 
         if (auth()->user()->instansi !== $appRequest->instansi->value && !auth()->user()->hasRole('admin')) {

@@ -332,7 +332,7 @@
             <tr>
                 <td class="label">Hari / Tanggal</td>
                 <td class="value">
-                    {{ $appRequest->start_date ? $appRequest->start_date->translatedFormat('l, d F Y') : '-' }}
+                    {{ $metadata->date_display ?? '-' }}
                 </td>
                 <td class="right-section">Notulis / Disiapkan oleh :</td>
                 <td class="right-value">{{ $appRequest->user->name ?? '-' }}</td>
@@ -353,7 +353,7 @@
                 <td class="label">Narasumber</td>
                 <td class="value">{{ $metadata->speakers }}</td>
                 <td class="right-section">Tanggal :</td>
-                <td class="right-value">{{ now()->translatedFormat('d F Y') }}</td>
+                <td class="right-value"></td>
             </tr>
             <tr>
                 <td class="label">Tempat</td>

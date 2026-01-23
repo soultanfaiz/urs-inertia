@@ -136,6 +136,7 @@ class SupportingNoteController extends Controller
             'place' => '',
             'participants' => '',
             'time' => '',
+            'date' => '',
         ];
 
         // Attempt to fill metadata using AI if notes exist
@@ -160,9 +161,26 @@ class SupportingNoteController extends Controller
         }
         $metadata['time_display'] = $finalTime;
 
+        // Determine Final Date Display (prioritas: tanggal dari notulen, fallback ke start_date)
+        $finalDate = '';
+        if (!empty($metadata['date'])) {
+            // Parse tanggal dari metadata AI (format YYYY-MM-DD) dan format ke Indonesia
+            try {
+                $dateObj = \Carbon\Carbon::parse($metadata['date']);
+                $dateObj->locale('id');
+                $finalDate = $dateObj->translatedFormat('l, d F Y');
+            } catch (\Exception $e) {
+                $finalDate = $metadata['date']; // Fallback jika parsing gagal
+            }
+        } elseif ($appRequest->start_date) {
+            $appRequest->start_date->locale('id');
+            $finalDate = $appRequest->start_date->translatedFormat('l, d F Y');
+        }
+        $metadata['date_display'] = $finalDate;
+
         // Process notes to replace placeholders with dynamic data
         $replacements = [
-            '[HARI_TANGGAL]' => $appRequest->start_date ? $appRequest->start_date->translatedFormat('l, d F Y') : '-',
+            '[HARI_TANGGAL]' => $metadata['date_display'] ?: '-',
             '[WAKTU]' => $metadata['time_display'] ?: '-', // Fallback to dash or keep empty? User said "kosongkan saja" for table, but usually placeholders in text might need content. Assuming empty is fine if "kosongkan saja" applies generally.
             '[TEMPAT]' => !empty($metadata['place']) ? $metadata['place'] : ($appRequest->place ?? ''),
             '[ACARA]' => $appRequest->title,
