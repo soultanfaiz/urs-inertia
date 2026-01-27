@@ -87,7 +87,9 @@ const submit = () => {
 
                             <!-- Upload File PDF -->
                             <div class="mb-6">
-                                <label for="file_pdf" class="block text-sm font-medium text-gray-700">Upload File (PDF)</label>
+                                <label for="file_pdf" class="block text-sm font-medium text-gray-700">
+                                    Upload File (PDF) <span v-if="isAdmin" class="text-gray-500 font-normal">(Opsional)</span>
+                                </label>
                                 <input
                                     type="file"
                                     name="file_pdf"

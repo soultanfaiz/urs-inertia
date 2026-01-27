@@ -115,12 +115,15 @@ class AppRequestController extends Controller
         $rules = [
             'title' => 'required|string|max:255',
             'description' => 'required|string',
-            'file_pdf' => 'required|file|mimes:pdf|max:2048',
         ];
 
-        // Jika admin, instansi wajib diisi dari form.
+        // Jika admin, instansi wajib diisi dari form dan file_pdf opsional.
         if ($isAdmin) {
             $rules['instansi'] = ['required', new Enum(Instansi::class)];
+            $rules['file_pdf'] = 'nullable|file|mimes:pdf|max:2048';
+        } else {
+            // Jika user biasa, file_pdf wajib.
+            $rules['file_pdf'] = 'required|file|mimes:pdf|max:2048';
         }
 
         $validatedData = $request->validate($rules);
@@ -128,17 +131,23 @@ class AppRequestController extends Controller
         // Jika bukan admin, ambil instansi dari data user, abaikan input form.
         $instansi = $isAdmin ? $validatedData['instansi'] : $user->instansi;
 
-        try {
-            // Upload menggunakan Library Native (bukan Facade Laravel)
-            $upload = (new UploadApi())->upload($request->file('file_pdf')->getRealPath(), [
-                'folder' => 'pdfs',
-                'resource_type' => 'raw',
-            ]);
+        $path = null;
+        $fileName = null;
 
-            // Ambil URL (Gunakan kurung siku [] karena hasilnya Array)
-            $path = $upload['secure_url'];
-        } catch (\Exception $e) {
-            return back()->withErrors(['file_pdf' => 'Gagal Upload: ' . $e->getMessage()])->withInput();
+        if ($request->hasFile('file_pdf')) {
+            try {
+                // Upload menggunakan Library Native (bukan Facade Laravel)
+                $upload = (new UploadApi())->upload($request->file('file_pdf')->getRealPath(), [
+                    'folder' => 'pdfs',
+                    'resource_type' => 'raw',
+                ]);
+
+                // Ambil URL (Gunakan kurung siku [] karena hasilnya Array)
+                $path = $upload['secure_url'];
+                $fileName = $request->file('file_pdf')->getClientOriginalName();
+            } catch (\Exception $e) {
+                return back()->withErrors(['file_pdf' => 'Gagal Upload: ' . $e->getMessage()])->withInput();
+            }
         }
         // --- SELESAI CONFIG MANUAL ---
 
@@ -149,8 +158,8 @@ class AppRequestController extends Controller
             'start_date' => now(),
             'end_date' => now()->addMonth(),
             'instansi' => $instansi,
-            'file_path' => $path, // Path yang didapat dari manual upload
-            'file_name' => $request->file('file_pdf')->getClientOriginalName(),
+            'file_path' => $path, // Bisa null jika admin tidak upload
+            'file_name' => $fileName, // Bisa null
             'status' => RequestStatus::PERMOHONAN,
             'verification_status' => VerificationStatus::MENUNGGU,
         ]);
