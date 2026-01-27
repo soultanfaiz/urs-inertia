@@ -3,6 +3,8 @@ import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import Pagination from '@/Components/Pagination.vue'; // Assuming you have a pagination component
 import { Head, Link, usePage, router } from '@inertiajs/vue3';
 import { computed, ref, watch } from 'vue';
+import { format, parseISO, isPast, differenceInDays } from 'date-fns';
+import { id as idLocale } from 'date-fns/locale';
 import GenerateReportModal from '@/Components/Modals/GenerateReportModal.vue';
 
 const props = defineProps({
@@ -101,6 +103,52 @@ watch(search, (newValue) => {
 // Watch status filter (langsung request saat berubah)
 watch(statusFilter, fetchData);
 
+const getNearestActivity = (request) => {
+    if (!request.development_activities || request.development_activities.length === 0) return null;
+    
+    // Filter: only include activities that are NOT completed AND have end_date
+    const validActivities = request.development_activities.filter(a => a.end_date && !a.is_completed);
+    if (validActivities.length === 0) return null;
+
+    // Sort by end_date ascending
+    const sorted = [...validActivities].sort((a, b) => new Date(a.end_date) - new Date(b.end_date));
+    
+    // Find first activity that is NOT in the past (future or today)
+    const upcoming = sorted.find(a => {
+        const date = parseISO(a.end_date);
+        // Compare dates ignoring time
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        date.setHours(0, 0, 0, 0);
+        return date >= today;
+    });
+    
+    if (upcoming) return upcoming;
+    
+    // If all are in past but still not completed, return the one with nearest past deadline
+    return sorted[sorted.length - 1];
+};
+
+const format_date_activity = (dateStr) => {
+    if (!dateStr) return '';
+    return format(parseISO(dateStr), 'd MMM yyyy', { locale: idLocale });
+};
+
+const getDeadlineColor = (activity) => {
+    if (!activity || !activity.end_date) return 'text-gray-500';
+    // If completed, maybe neutral color? The prompt didn't specify, but red for overdue is good.
+    if (activity.is_completed) return 'text-green-600'; 
+
+    const deadline = parseISO(activity.end_date);
+    if (isPast(deadline)) return 'text-red-600';
+    
+    const now = new Date();
+    const diff = differenceInDays(deadline, now);
+    if (diff <= 7) return 'text-yellow-600';
+    
+    return 'text-gray-600';
+};
+
 </script>
 
 <template>
@@ -162,7 +210,7 @@ watch(statusFilter, fetchData);
                     >
                         <div class="grid grid-cols-1 md:grid-cols-12 gap-4 items-start md:items-center">
                             <!-- Judul, Tanggal, dan Pemohon -->
-                            <div class="md:col-span-5 lg:col-span-4">
+                            <div class="md:col-span-4 lg:col-span-3">
                                 <p class="font-semibold text-gray-900 group-hover:text-blue-600">{{ request.title }}</p>
                                 <p class="text-sm text-gray-500">
                                     oleh {{ request.user.name }} &bull; {{ format_date(request.created_at) }}
@@ -170,13 +218,29 @@ watch(statusFilter, fetchData);
                             </div>
 
                             <!-- Instansi -->
-                            <div class="md:col-span-3 lg:col-span-2">
+                            <div class="md:col-span-2 lg:col-span-2">
                                 <p class="text-sm text-gray-500">Instansi</p>
                                 <p class="font-medium text-gray-900">{{ request.instansi }}</p>
                             </div>
 
+                             <!-- Development Activity -->
+                            <div class="md:col-span-3 lg:col-span-3">
+                                <template v-if="getNearestActivity(request)">
+                                    <p class="text-sm text-gray-500">Aktivitas Terdekat</p>
+                                    <div class="font-medium text-gray-900 text-sm whitespace-normal break-words">
+                                       {{ getNearestActivity(request).description }}
+                                    </div>
+                                    <p class="text-xs mt-1" :class="getDeadlineColor(getNearestActivity(request))">
+                                        Due: {{ format_date_activity(getNearestActivity(request).end_date) }}
+                                    </p>
+                                </template>
+                                <template v-else>
+                                    <p class="text-sm text-gray-400 italic">-</p>
+                                </template>
+                            </div>
+
                             <!-- Status dan Aksi -->
-                            <div class="md:col-span-4 lg:col-span-6 flex flex-col sm:flex-row sm:flex-wrap items-start sm:items-center justify-start md:justify-end gap-2 md:gap-4 mt-2 md:mt-0">
+                            <div class="md:col-span-3 lg:col-span-4 flex flex-col sm:flex-row sm:flex-wrap items-start sm:items-center justify-start md:justify-end gap-2 md:gap-4 mt-2 md:mt-0">
                                 <!-- Badge Status -->
                                 <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium" :class="getStatus(request).class">
                                     {{ getStatus(request).text }}

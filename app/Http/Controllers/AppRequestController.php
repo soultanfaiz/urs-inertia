@@ -59,7 +59,19 @@ class AppRequestController extends Controller
         };
 
         // Ambil data permohonan berdasarkan role
-        $appRequestsQuery = AppRequest::with('user')->latest('updated_at');
+        // Sort by nearest incomplete development activity due date
+        $nearestActivitySubquery = \App\Models\DevelopmentActivity::selectRaw('app_request_id, MIN(end_date) as nearest_due_date')
+            ->where('is_completed', false)
+            ->groupBy('app_request_id');
+
+        $appRequestsQuery = AppRequest::with(['user', 'developmentActivities'])
+            ->select('app_requests.*')
+            ->leftJoinSub($nearestActivitySubquery, 'nearest_activities', function ($join) {
+                $join->on('app_requests.id', '=', 'nearest_activities.app_request_id');
+            })
+            ->orderByRaw('nearest_activities.nearest_due_date IS NULL')  // NULL values last
+            ->orderBy('nearest_activities.nearest_due_date', 'asc')
+            ->orderBy('app_requests.updated_at', 'desc');  // Secondary sort
 
         if (!auth()->user()->hasRole('admin')) {
             // Jika bukan admin, tampilkan semua permohonan dari instansi yang sama.

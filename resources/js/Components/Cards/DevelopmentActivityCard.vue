@@ -19,7 +19,8 @@ const enums = computed(() => usePage().props.enums);
 const shouldShowCard = computed(() => {
     const status = props.appRequest.status;
     const requestStatusEnum = enums.value.requestStatus;
-    return status !== requestStatusEnum.PERMOHONAN && status !== requestStatusEnum.URS;
+    return true;
+    //return status !== requestStatusEnum.PERMOHONAN && status !== requestStatusEnum.URS;
 });
 
 // --- Local State ---
