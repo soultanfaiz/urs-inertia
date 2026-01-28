@@ -283,7 +283,7 @@ class AppRequestController extends Controller
 
         // ... (Kode validasi sebelumnya tetap sama)
         $validated = $request->validate([
-            'file_support_pdf' => 'required|file|mimes:pdf|max:2048',
+            'file_support_pdf' => 'required|file|mimes:pdf|max:5000',   
         ]);
 
         $file = $request->file('file_support_pdf');

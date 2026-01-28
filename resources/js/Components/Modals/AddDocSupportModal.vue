@@ -82,7 +82,7 @@ const closeModal = () => {
                         :class="{ 'rounded-md ring-1 ring-red-500': form.errors.file_support_pdf }"
                     >
                     <progress v-if="form.progress" :value="form.progress.percentage" max="100" class="mt-2 w-full">{{ form.progress.percentage }}%</progress>
-                    <p class="mt-1 text-xs text-gray-500">Maksimal ukuran file: 2MB.</p>
+                    <p class="mt-1 text-xs text-gray-500">Maksimal ukuran file: 5MB.</p>
                     <InputError :message="form.errors.file_support_pdf" class="mt-2" />
                 </div>
 
