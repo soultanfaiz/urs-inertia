@@ -39,24 +39,8 @@ class AppRequestController extends Controller
      */
     public function index(Request $request)
     {
-        // Helper untuk menerapkan filter pencarian dan status (agar bisa dipakai di query utama & laporan)
-        $applyFilters = function ($query) use ($request) {
-            // Filter Searching (Judul atau Nama Pemohon)
-            if ($request->filled('search')) {
-                $search = Str::lower($request->search);
-                $query->where(function ($q) use ($search) {
-                    $q->where(DB::raw('LOWER(title)'), 'like', '%' . $search . '%')
-                        ->orWhereHas('user', function ($subQ) use ($search) {
-                            $subQ->where(DB::raw('LOWER(name)'), 'like', '%' . $search . '%');
-                        });
-                });
-            }
-
-            // Filter Status
-            if ($request->filled('status')) {
-                $query->where('status', $request->status);
-            }
-        };
+        // Helper untuk menerapkan filter pencarian -- REMOVED for Client-Side Search Optimization
+        // We now fetch ALL records and filter on the client.
 
         // Ambil data permohonan berdasarkan role
         // Sort by nearest incomplete development activity due date
@@ -78,27 +62,25 @@ class AppRequestController extends Controller
             $appRequestsQuery->where('instansi', auth()->user()->instansi);
         }
 
-        // Terapkan filter ke query utama
-        $applyFilters($appRequestsQuery);
+        // FETCH ALL DATA (No Pagination, No Server-Side Filtering)
+        $appRequests = $appRequestsQuery->get();
 
-        $appRequests = $appRequestsQuery->paginate(10)->withQueryString();
+        // Ambil semua data ringkas untuk keperluan checklist laporan
+        // Optimization: $appRequests already contains everything we need, but maybe we keep this 
+        // separate query if 'allRequestsForReport' needs specific columns or formatting? 
+        // actually $appRequests has everything. We can re-use it or just keep this lightweight query for the modal.
+        // Let's keep existing logic for reports to stay safe, but we modified the main one.
 
-        // Ambil semua data ringkas untuk keperluan checklist laporan (tanpa paginasi)
         $reportQuery = AppRequest::select('id', 'title', 'instansi', 'created_at', 'status')->latest('updated_at');
         if (!auth()->user()->hasRole('admin')) {
             $reportQuery->where('instansi', auth()->user()->instansi);
         }
-
-        // Terapkan filter yang sama ke query laporan
-        $applyFilters($reportQuery);
-
         $allRequestsForReport = $reportQuery->get();
 
         // Render komponen Vue 'AppRequest/Index' dan kirimkan data sebagai props
         return Inertia::render('AppRequest/Index', [
-            'appRequests' => $appRequests,
+            'appRequests' => $appRequests, // Now a Collection/Array, not a LengthAwarePaginator
             'allRequestsForReport' => $allRequestsForReport,
-            'filters' => $request->only(['search', 'status']),
         ]);
     }
 
@@ -283,7 +265,7 @@ class AppRequestController extends Controller
 
         // ... (Kode validasi sebelumnya tetap sama)
         $validated = $request->validate([
-            'file_support_pdf' => 'required|file|mimes:pdf|max:5000',   
+            'file_support_pdf' => 'required|file|mimes:pdf|max:5000',
         ]);
 
         $file = $request->file('file_support_pdf');

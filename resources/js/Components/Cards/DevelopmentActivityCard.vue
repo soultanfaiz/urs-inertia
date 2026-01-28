@@ -35,6 +35,7 @@ const dragIndex = ref(null);
 const newActivityForm = useForm({
     description: '',
     sub_activities: [''],
+    start_date: '',
     end_date: '',
 });
 
@@ -65,7 +66,7 @@ const getDeadlineInfo = (activity) => {
     });
 
     return {
-        date: format(deadline, 'd MMM yyyy', { locale: idLocale }),
+        date: format(deadline, 'd MMM yyyy HH:mm', { locale: idLocale }),
         status: statusText.value,
         textColor: textColor.value,
         isOverdue: isOverdue,
@@ -96,7 +97,8 @@ const toggleEditMode = () => {
 const startEdit = (activity) => {
     editForms.value[activity.id] = useForm({
         description: activity.description,
-        end_date: activity.end_date ? format(parseISO(activity.end_date), 'yyyy-MM-dd') : '',
+        start_date: activity.start_date ? format(parseISO(activity.start_date), "yyyy-MM-dd'T'HH:mm") : '',
+        end_date: activity.end_date ? format(parseISO(activity.end_date), "yyyy-MM-dd'T'HH:mm") : '',
     });
 };
 
@@ -111,13 +113,32 @@ const saveEdit = async (activityId) => {
     form.processing = true;
 
     try {
-        await axios.patch(route('development-activity.update', activityId), form.data());
+        // Transform dates to ISO string (UTC) to ensure correct timezone handling
+        const data = form.data();
+        const payload = { ...data };
+        if (payload.start_date) payload.start_date = new Date(payload.start_date).toISOString();
+        if (payload.end_date) payload.end_date = new Date(payload.end_date).toISOString();
+
+        await axios.patch(route('development-activity.update', activityId), payload);
 
         // Manually update the local state on success
         const activity = activities.value.find(a => a.id === activityId);
         if (activity) {
             activity.description = form.description;
-            activity.end_date = form.end_date; // The format is already yyyy-MM-dd, which is fine for display logic
+            // Update local state with the saved ISO strings (optional, but good for consistency immediately)
+            // But since edit inputs use format(), they will re-parse correctly next time.
+            // For now just keeping the form values might be safer for UI "flicker" avoidance, 
+            // but effectively we want the source of truth to be what is saved.
+            // Let's rely on what was in the form, but maybe we should ideally use the response from server if possible.
+            // Since the controller returns JSON on validation error but doesn't return the model on success update (for JSON requests it returns message),
+            // wait, the controller update method:
+            // if ($request->wantsJson()) { ... return response()->json([...]); }
+            // It does NOT return the updated model. So we have to rely on optimistic update or local form values.
+            // The issue is if we set `activity.start_date` to `payload.start_date` (ISO UTC), 
+            // then `startEdit` calls `parseISO` -> `format`. It works.
+            
+            if (payload.start_date) activity.start_date = payload.start_date; 
+            if (payload.end_date) activity.end_date = payload.end_date; 
         }
 
         // Close the edit form
@@ -210,14 +231,20 @@ const removeSubActivityField = (index) => {
 };
 
 const saveNewActivity = () => {
-    newActivityForm.post(route('app-request.development-activity.store', props.appRequest.id), {
-        preserveScroll: true,
-        onSuccess: () => {
-            newActivityForm.reset();
-            newActivityForm.sub_activities = ['']; // Reset to one empty field
-            showNewActivityForm.value = false; // Hide form on success
-        }
-    });
+    newActivityForm
+        .transform((data) => ({
+            ...data,
+            start_date: data.start_date ? new Date(data.start_date).toISOString() : null,
+            end_date: data.end_date ? new Date(data.end_date).toISOString() : null,
+        }))
+        .post(route('app-request.development-activity.store', props.appRequest.id), {
+            preserveScroll: true,
+            onSuccess: () => {
+                newActivityForm.reset();
+                newActivityForm.sub_activities = ['']; // Reset to one empty field
+                showNewActivityForm.value = false; // Hide form on success
+            }
+        });
 };
 
 // --- Drag and Drop Handlers ---
@@ -284,9 +311,15 @@ const handleDrop = async (event, targetIndex) => {
                         <div v-if="isAdmin && isEditingAll && editForms[activity.id]">
                             <form @submit.prevent="saveEdit(activity.id)">
                                 <input type="text" v-model="editForms[activity.id].description" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm mb-2" placeholder="Deskripsi aktivitas...">
-                                <div class="mt-2 mb-2">
-                                    <label class="text-xs text-gray-600">Deadline</label>
-                                    <input type="date" v-model="editForms[activity.id].end_date" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                                <div class="mt-2 mb-2 grid grid-cols-1 md:grid-cols-2 gap-2">
+                                    <div>
+                                        <label class="text-xs text-gray-600">Mulai</label>
+                                        <input type="datetime-local" v-model="editForms[activity.id].start_date" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                                    </div>
+                                    <div>
+                                        <label class="text-xs text-gray-600">Selesai (Deadline)</label>
+                                        <input type="datetime-local" v-model="editForms[activity.id].end_date" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                                    </div>
                                 </div>
                                 <div class="flex items-center gap-2 mt-2">
                                     <button type="submit" :disabled="editForms[activity.id].processing" class="inline-flex items-center px-3 py-1 text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md">
@@ -420,18 +453,24 @@ const handleDrop = async (event, targetIndex) => {
                         </div>
                         <button type="button" @click="addSubActivityField" class="mt-3 text-sm text-blue-600 hover:text-blue-800">+ Tambah Detail</button>
                     </div>
-                    <div>
-                        <label for="new_end_date" class="block text-sm font-medium text-gray-700">Tanggal Selesai (Opsional)</label>
-                        <input type="date" id="new_end_date" v-model="newActivityForm.end_date" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label for="new_start_date" class="block text-sm font-medium text-gray-700">Tanggal Mulai (Opsional)</label>
+                            <input type="datetime-local" id="new_start_date" v-model="newActivityForm.start_date" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm">
+                        </div>
+                         <div>
+                            <label for="new_end_date" class="block text-sm font-medium text-gray-700">Tanggal Selesai (Opsional)</label>
+                            <input type="datetime-local" id="new_end_date" v-model="newActivityForm.end_date" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm">
+                        </div>
                     </div>
-                    <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-2">
-                     <button type="button" @click="showNewActivityForm = false" class="inline-flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
-                        Batal
-                    </button>
-                    <button type="submit" :disabled="newActivityForm.processing" class="inline-flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50">
-                        {{ newActivityForm.processing ? 'Menyimpan...' : 'Simpan Aktivitas' }}
-                    </button>
-                </div>
+                    <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-2 mt-4">
+                        <button type="button" @click="showNewActivityForm = false" class="inline-flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
+                            Batal
+                        </button>
+                        <button type="submit" :disabled="newActivityForm.processing" class="inline-flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50">
+                            {{ newActivityForm.processing ? 'Menyimpan...' : 'Simpan Aktivitas' }}
+                        </button>
+                    </div>
                 </div>
             </form>
         </div>

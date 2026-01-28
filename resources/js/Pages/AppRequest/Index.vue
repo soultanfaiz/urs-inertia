@@ -1,30 +1,29 @@
 <script setup>
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
-import Pagination from '@/Components/Pagination.vue'; // Assuming you have a pagination component
+import Pagination from '@/Components/Pagination.vue'; 
+import ClientPagination from '@/Components/ClientPagination.vue'; // New component
 import { Head, Link, usePage, router } from '@inertiajs/vue3';
 import { computed, ref, watch } from 'vue';
-import { format, parseISO, isPast, differenceInDays } from 'date-fns';
+import { format, parseISO, isPast, differenceInDays, isSameDay } from 'date-fns';
 import { id as idLocale } from 'date-fns/locale';
 import GenerateReportModal from '@/Components/Modals/GenerateReportModal.vue';
 
 const props = defineProps({
     appRequests: {
-        type: Object,
+        type: Array, // Now receiving all data as an array
         required: true,
     },
     allRequestsForReport: {
         type: Array,
         default: () => [],
     },
-    filters: {
-        type: Object,
-        default: () => ({ search: '', status: '' }),
-    },
 });
 
 const user = computed(() => usePage().props.auth.user);
+// Removed key computed property as we are typically not forcing re-render of the whole page on filter change now
+// But we might want to keep it if there are other reasons. The original code used url as key.
+// With client side, url doesn't change on search. So let's just ignore it or use a static key if needed.
 
-const key = computed(() => usePage().url);
 const format_date = (value) => {
     if (value) {
         const date = new Date(value);
@@ -75,33 +74,62 @@ const getStatus = (request) => {
 
 const showingReportModal = ref(false);
 
-// State untuk filter
-const search = ref(props.filters?.search ?? '');
-const statusFilter = ref(props.filters?.status ?? '');
+// State untuk filter client-side
+const search = ref('');
+const statusFilter = ref('');
 
-// Fungsi untuk fetch data dengan filter
-const fetchData = () => {
-    router.get(route('app-requests.index'), {
-        search: search.value,
-        status: statusFilter.value
-    }, {
-        preserveState: true,
-        preserveScroll: true,
-        replace: true,
-    });
-};
+// --- Clients-Side Filtering & Pagination ---
 
-// Debounce sederhana untuk search agar tidak request setiap ketikan
-let timeout = null;
-watch(search, (newValue) => {
-    clearTimeout(timeout);
-    timeout = setTimeout(() => {
-        fetchData();
-    }, 300);
+// 1. Filter Data
+const filteredRequests = computed(() => {
+    let result = props.appRequests;
+
+    // Filter by Status
+    if (statusFilter.value) {
+        result = result.filter(req => req.status === statusFilter.value);
+    }
+
+    // Filter by Search (Title, User, Instansi)
+    if (search.value) {
+        const query = search.value.toLowerCase();
+        result = result.filter(req => {
+            const titleMatch = req.title.toLowerCase().includes(query);
+            const userMatch = req.user.name.toLowerCase().includes(query);
+            const instansiMatch = req.instansi && req.instansi.toLowerCase().includes(query);
+            
+            return titleMatch || userMatch || instansiMatch;
+        });
+    }
+
+    return result;
 });
 
-// Watch status filter (langsung request saat berubah)
-watch(statusFilter, fetchData);
+// 2. Pagination State
+const currentPage = ref(1);
+const itemsPerPage = 10;
+
+// Reset page to 1 when filters change
+watch([search, statusFilter], () => {
+    currentPage.value = 1;
+});
+
+// 3. Paginated Data
+const totalPages = computed(() => Math.ceil(filteredRequests.value.length / itemsPerPage));
+
+const paginatedRequests = computed(() => {
+    const start = (currentPage.value - 1) * itemsPerPage;
+    const end = start + itemsPerPage;
+    return filteredRequests.value.slice(start, end);
+});
+
+// 4. Change Page Function
+const changePage = (page) => {
+    if (page >= 1 && page <= totalPages.value) {
+        currentPage.value = page;
+    }
+};
+
+// Remove server-side fetching logic (fetchData, watchers on search with debounce, router.get)
 
 const getNearestActivity = (request) => {
     if (!request.development_activities || request.development_activities.length === 0) return null;
@@ -129,9 +157,24 @@ const getNearestActivity = (request) => {
     return sorted[sorted.length - 1];
 };
 
-const format_date_activity = (dateStr) => {
-    if (!dateStr) return '';
-    return format(parseISO(dateStr), 'd MMM yyyy', { locale: idLocale });
+const format_date_activity = (activity) => {
+    if (!activity || !activity.end_date) return '';
+
+    const endDate = parseISO(activity.end_date);
+
+    if (activity.start_date) {
+        const startDate = parseISO(activity.start_date);
+        
+        if (isSameDay(startDate, endDate)) {
+             return format(startDate, 'd MMM yyyy HH:mm', { locale: idLocale }) + ' - ' + format(endDate, 'HH:mm', { locale: idLocale });
+        } else {
+             // Different days: "29 Jan 2026 - 31 Jan 2026"
+             return format(startDate, 'd MMM yyyy', { locale: idLocale }) + ' - ' + format(endDate, 'd MMM yyyy', { locale: idLocale });
+        }
+    }
+
+    // fallback if no start date
+    return format(endDate, 'd MMM yyyy', { locale: idLocale });
 };
 
 const getDeadlineColor = (activity) => {
@@ -183,7 +226,7 @@ const getDeadlineColor = (activity) => {
                         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <!-- Input Search -->
                             <div class="md:col-span-2">
-                                <input v-model="search" type="text" placeholder="Cari berdasarkan judul atau nama pemohon..." class="w-full border-gray-300 focus:border-blue-500 focus:ring-blue-500 rounded-md shadow-sm text-sm">
+                                <input v-model="search" type="text" placeholder="Cari berdasarkan judul, nama pemohon, atau instansi..." class="w-full border-gray-300 focus:border-blue-500 focus:ring-blue-500 rounded-md shadow-sm text-sm">
                             </div>
                             <!-- Dropdown Status -->
                             <div>
@@ -201,9 +244,9 @@ const getDeadlineColor = (activity) => {
                 </div>
 
                 <!-- Daftar Permohonan -->
-                <div v-if="appRequests.data.length > 0" class="space-y-4">
+                <div v-if="paginatedRequests.length > 0" class="space-y-4">
                     <Link
-                        v-for="request in appRequests.data"
+                        v-for="request in paginatedRequests"
                         :key="request.id"
                         :href="route('app-requests.show', request.id)"
                         class="block p-4 bg-white shadow-sm transition duration-150 ease-in-out hover:shadow-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 sm:rounded-lg"
@@ -231,7 +274,7 @@ const getDeadlineColor = (activity) => {
                                        {{ getNearestActivity(request).description }}
                                     </div>
                                     <p class="text-xs mt-1" :class="getDeadlineColor(getNearestActivity(request))">
-                                        Due: {{ format_date_activity(getNearestActivity(request).end_date) }}
+                                        Due: {{ format_date_activity(getNearestActivity(request)) }}
                                     </p>
                                 </template>
                                 <template v-else>
@@ -259,15 +302,22 @@ const getDeadlineColor = (activity) => {
 
                 <!-- Empty State -->
                 <div v-else class="p-12 text-center bg-white shadow-sm sm:rounded-lg">
-                    <h3 class="text-lg font-medium text-gray-900">Belum Ada Permohonan</h3>
-                    <p class="mt-1 text-sm text-gray-500">
-                        Anda belum mengajukan permohonan apa pun. Silakan klik tombol "Ajukan Permohonan" untuk memulai.
+                    <h3 class="text-lg font-medium text-gray-900">Tidak Ditemukan Permohonan</h3>
+                     <p v-if="filteredRequests.length === 0 && appRequests.length > 0" class="mt-1 text-sm text-gray-500">
+                        Tidak ada permohonan yang cocok dengan filter pencarian Anda.
+                    </p>
+                    <p v-else class="mt-1 text-sm text-gray-500">
+                        Belum ada permohonan yang diajukan.
                     </p>
                 </div>
 
-                <!-- Tautan Paginasi -->
-                <div v-if="appRequests.links.length > 3" class="mt-8">
-                    <Pagination :links="appRequests.links" />
+                <!-- Client-Side Pagination Controls -->
+                <div class="mt-8 flex justify-center">
+                    <ClientPagination 
+                        :current-page="currentPage" 
+                        :total-pages="totalPages" 
+                        @page-change="changePage" 
+                    />
                 </div>
             </div>
         </div>
