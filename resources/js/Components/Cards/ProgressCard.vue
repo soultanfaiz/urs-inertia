@@ -1,6 +1,6 @@
 <script setup>
 import { computed } from 'vue';
-import { format, parseISO, isPast, differenceInDays, formatDistanceToNow } from 'date-fns';
+import { format, parseISO, isPast, differenceInDays, formatDistanceToNow, isValid } from 'date-fns';
 import { id } from 'date-fns/locale';
 
 const props = defineProps({
@@ -45,7 +45,9 @@ const currentStepName = computed(() => {
 
 // --- Deadline Calculation Logic ---
 const deadline = computed(() => {
-    return props.appRequest.end_date ? parseISO(props.appRequest.end_date) : null;
+    if (!props.appRequest.end_date) return null;
+    const date = parseISO(props.appRequest.end_date);
+    return isValid(date) ? date : null;
 });
 
 const isOverdue = computed(() => {

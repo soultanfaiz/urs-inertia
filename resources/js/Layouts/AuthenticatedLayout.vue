@@ -12,8 +12,13 @@ const isMobile = ref(false);
 const mobileBreakpoint = 1024; // Tailwind's 'lg' breakpoint
 
 const checkScreenSize = () => {
-    isMobile.value = window.innerWidth < mobileBreakpoint;
+    if (typeof window !== 'undefined') {
+        isMobile.value = window.innerWidth < mobileBreakpoint;
+    }
 };
+
+// Check immediately in setup if client-side
+checkScreenSize();
 
 onMounted(() => {
     checkScreenSize();
