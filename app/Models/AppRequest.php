@@ -13,7 +13,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class AppRequest extends Model
 {
-    use HasUuids,HasFactory;
+    use HasUuids, HasFactory;
 
     /**
      * The attributes that are mass assignable.
@@ -28,6 +28,7 @@ class AppRequest extends Model
         'end_date',
         'instansi',
         'file_path',
+        'file_name',
         'status',
         'verification_status',
     ];
@@ -68,4 +69,10 @@ class AppRequest extends Model
     {
         return $this->hasMany(DevelopmentActivity::class);
     }
+
+    public function supportingNotes(): HasMany
+    {
+        return $this->hasMany(SupportingNote::class)->latest();
+    }
+
 }

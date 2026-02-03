@@ -35,4 +35,15 @@ return [
         ],
     ],
 
+    'openrouter' => [
+        'api_key' => env('OPENROUTER_API_KEY'),
+        'base_url' => 'https://openrouter.ai/api/v1',
+        // Multiple models with fallback - will try in order if one fails
+        'models' => array_filter([
+            env('OPENROUTER_MODEL_1', 'tngtech/deepseek-r1t2-chimera:free'),
+            env('OPENROUTER_MODEL_2'),
+            env('OPENROUTER_MODEL_3'),
+        ]),
+    ],
+
 ];

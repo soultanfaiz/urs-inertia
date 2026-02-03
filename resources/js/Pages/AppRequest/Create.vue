@@ -1,6 +1,7 @@
 <script setup>
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
-import { Head, useForm } from '@inertiajs/vue3';
+import { Head, useForm, usePage } from '@inertiajs/vue3';
+import { computed } from 'vue';
 
 const props = defineProps({
     instansi: {
@@ -9,10 +10,14 @@ const props = defineProps({
     },
 });
 
+const user = computed(() => usePage().props.auth.user);
+const isAdmin = computed(() => user.value?.roles?.some(role => role.name === 'admin'));
+
 const form = useForm({
     title: '',
     description: '',
-    instansi: '',
+    // Jika bukan admin, isi otomatis dengan instansi user. Jika admin, kosongkan agar bisa memilih.
+    instansi: isAdmin.value ? '' : user.value.instansi,
     file_pdf: null,
 });
 
@@ -60,9 +65,20 @@ const submit = () => {
                             <!-- Pilihan Instansi -->
                             <div class="mb-4">
                                 <label for="instansi" class="block text-sm font-medium text-gray-700">Instansi</label>
-                                <select id="instansi" name="instansi" v-model="form.instansi" class="mt-1 block w-full rounded-md border-gray-300 py-2 pl-3 pr-10 text-base focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm" :class="{ 'border-red-500': form.errors.instansi }" required>
+                                <select
+                                    id="instansi"
+                                    name="instansi"
+                                    v-model="form.instansi"
+                                    class="mt-1 block w-full rounded-md border-gray-300 py-2 pl-3 pr-10 text-base focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
+                                    :class="{
+                                        'border-red-500': form.errors.instansi,
+                                        'bg-gray-100 text-gray-500 cursor-not-allowed': !isAdmin
+                                    }"
+                                    :disabled="!isAdmin"
+                                    required
+                                >
                                     <option value="" disabled>Pilih Instansi</option>
-                                    <option v-for="item in instansi" :key="item.value" :value="item.value">
+                                    <option v-for="item in instansi" :key="item.value" :value="item.value" :disabled="!isAdmin && item.value !== user.instansi">
                                         {{ item.label }}
                                     </option>
                                 </select>
@@ -71,7 +87,9 @@ const submit = () => {
 
                             <!-- Upload File PDF -->
                             <div class="mb-6">
-                                <label for="file_pdf" class="block text-sm font-medium text-gray-700">Upload File (PDF)</label>
+                                <label for="file_pdf" class="block text-sm font-medium text-gray-700">
+                                    Upload File (PDF) <span v-if="isAdmin" class="text-gray-500 font-normal">(Opsional)</span>
+                                </label>
                                 <input
                                     type="file"
                                     name="file_pdf"

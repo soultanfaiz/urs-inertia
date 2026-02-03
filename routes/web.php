@@ -4,11 +4,15 @@ use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\AppRequestController; // Tambahkan ini
 use App\Http\Controllers\SubDevelopmentActivityController;
+use App\Http\Controllers\SupportingNoteController;
+use App\Http\Controllers\AIGeneratorController;
+use App\Http\Controllers\NotificationController;
 use Illuminate\Foundation\Application;
 use App\Http\Controllers\DevelopmentActivityController;
+use App\Http\Controllers\PicController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
-use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\File;
 
 Route::get('/', function () {
     return Inertia::render('Welcome', [
@@ -16,11 +20,6 @@ Route::get('/', function () {
         'canRegister' => Route::has('register'),
         'laravelVersion' => Application::VERSION,
         'phpVersion' => PHP_VERSION,
-        'auth' => [
-            'user' => Auth::user(), // Mengirimkan data pengguna yang sedang login (jika ada)
-            // Anda juga dapat mengirimkan peran pengguna di sini jika diperlukan oleh komponen Welcome:
-            // 'roles' => Auth::user()?->getRoleNames() ?? [],
-        ],
     ]);
 });
 
@@ -44,10 +43,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/app-requests/image-support/{imageSupport}/view', [AppRequestController::class, 'viewImageSupport'])->name('app-request.image-support.view');
     Route::post('/app-requests/doc-support/{docSupport}/verify', [AppRequestController::class, 'verifyDocSupport'])->name('app-request.doc-support.verify');
     Route::post('/app-requests/image-support/{imageSupport}/verify', [AppRequestController::class, 'verifyImageSupport'])->name('app-request.image-support.verify');
+    Route::post('/app-requests/report', [AppRequestController::class, 'generateReport'])->name('app-requests.generate-report');
 
     // Rute untuk Development Activities (Hanya Admin)
     Route::middleware('role:admin')->group(function () {
         Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+        Route::get('/development-activities', [DevelopmentActivityController::class, 'index'])->name('development-activities.index');
+        Route::post('/development-activities/assign-pic', [DevelopmentActivityController::class, 'assignPic'])->name('development-activities.assign-pic');
         Route::post('/app-requests/{appRequest}/development-activities', [DevelopmentActivityController::class, 'store'])->name('app-request.development-activity.store');
         Route::patch('/development-activities/{developmentActivity}', [DevelopmentActivityController::class, 'update'])->name('development-activity.update');
         Route::delete('/development-activities/{developmentActivity}', [DevelopmentActivityController::class, 'destroy'])->name('development-activity.destroy');
@@ -61,7 +63,34 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
         // Rute untuk menambahkan sub-aktivitas ke aktivitas pengembangan yang ada
         Route::post('/development-activities/{developmentActivity}/add-sub-activities', [DevelopmentActivityController::class, 'addSubActivities'])->name('development-activity.add-sub-activities');
+        Route::post('/app-requests/{appRequest}/add-note', [SupportingNoteController::class, 'store'])
+            ->name('supporting-note.store');
+
+        // Route untuk AI generate note
+        Route::post('/app-requests/{appRequest}/generate-note', [AIGeneratorController::class, 'generateNote'])
+            ->name('ai.generate-note');
+
+        Route::put('/supporting-notes/{supportingNote}', [SupportingNoteController::class, 'update'])
+            ->name('supporting-note.update');
+
+        Route::delete('/supporting-notes/{supportingNote}', [SupportingNoteController::class, 'destroy'])
+            ->name('supporting-note.destroy');
+
+        // Manajemen
+        Route::get('/management/pics', [PicController::class, 'index'])->name('management.pics.index');
+        Route::post('/management/pics', [PicController::class, 'store'])->name('management.pics.store');
+        Route::patch('/management/pics/{pic}', [PicController::class, 'update'])->name('management.pics.update');
+        Route::delete('/management/pics/{pic}', [PicController::class, 'destroy'])->name('management.pics.destroy');
     });
+
+    // Rute untuk laporan catatan pendukung (dapat diakses admin dan user terkait)
+    Route::get('/app-requests/{appRequest}/supporting-notes/report', [SupportingNoteController::class, 'generateReport'])
+        ->name('supporting-notes.generate-report');
+
+    // Rute untuk Notifikasi
+    Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
+    Route::post('/notifications/{notification}/mark-as-read', [NotificationController::class, 'markAsRead'])->name('notifications.markAsRead');
+    Route::post('/notifications/mark-all-as-read', [NotificationController::class, 'markAllAsRead'])->name('notifications.markAllAsRead');
 
     // ... (Tambahkan rute custom lain di sini jika ada)
 
@@ -75,5 +104,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
 //         'config' => config('cloudinary.cloud_url')
 //     ]);
 // });
+
 
 require __DIR__ . '/auth.php';

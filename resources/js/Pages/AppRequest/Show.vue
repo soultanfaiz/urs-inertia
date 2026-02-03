@@ -6,11 +6,13 @@ import ProgressCard from '@/Components/Cards/ProgressCard.vue';
 import RequestInfoCard from '@/Components/Cards/RequestInfoCard.vue';
 import RequestHistoryCard from '@/Components/Cards/RequestHistoryCard.vue';
 import SupportingDocumentsCard from '@/Components/Cards/SupportingDocumentsCard.vue';
+import SupportingNotesCard from '@/Components/Cards/SupportingNotesCard.vue';
 import DevelopmentActivityCard from '@/Components/Cards/DevelopmentActivityCard.vue';
 import VerifyRequestModal from '@/Components/Modals/VerifyRequestModal.vue';
 import ChangeRequestStatusModal from '@/Components/Modals/ChangeRequestStatusModal.vue';
 import AddDocSupportModal from '@/Components/Modals/AddDocSupportModal.vue';
 import AddImageSupportModal from '@/Components/Modals/AddImageSupportModal.vue';
+import AddSupportingNoteModal from '@/Components/Modals/AddSupportingNoteModal.vue';
 import VerifyDocSupportModal from '@/Components/Modals/VerifyDocSupportModal.vue';
 import VerifyImageSupportModal from '@/Components/Modals/VerifyImageSupportModal.vue';
 import RejectionAlert from '@/Components/Alerts/RejectionAlert.vue';
@@ -20,6 +22,10 @@ const props = defineProps({
     appRequest: {
         type: Object,
         required: true,
+    },
+    pics: {
+        type: Array,
+        default: () => [],
     }
 });
 
@@ -54,17 +60,24 @@ const canChangeStatus = computed(() => {
     // 1. Must be admin
     if (!isAdmin.value) return false;
 
-    // 2. Get the latest history for the current status
-    const history = latestHistoryForCurrentStatus.value;
-    if (!history || !history.doc_supports || history.doc_supports.length === 0) return false;
-
-    // 3. Check if at least one document in that history is approved
-    return history.doc_supports.some(doc => doc.verification_status === enums.value.verificationStatus.DISETUJUI);
+    return true;
 });
 
 // State for Add Modals
 const showingAddDocSupportModal = ref(false);
 const showingAddImageSupportModal = ref(false);
+const showingAddNoteModal = ref(false);
+const noteToEdit = ref(null);
+
+const openAddNoteModal = () => {
+    noteToEdit.value = null;
+    showingAddNoteModal.value = true;
+};
+
+const openEditNoteModal = (note) => {
+    noteToEdit.value = note;
+    showingAddNoteModal.value = true;
+};
 
 // State for Verification Modals
 const showingVerifyRequestModal = ref(false);
@@ -148,7 +161,12 @@ const latestHistoryForUpload = computed(() => {
                         @open-verify-doc-modal="openDocVerifyModal"
                         @open-verify-image-modal="openImageVerifyModal"
                     />
-                    <DevelopmentActivityCard :app-request="appRequest" />
+                    <SupportingNotesCard
+                        :app-request="appRequest"
+                        @open-add-note-modal="openAddNoteModal"
+                        @open-edit-note-modal="openEditNoteModal"
+                    />
+                    <DevelopmentActivityCard :app-request="appRequest" :pics="pics" />
                     <RequestHistoryCard :app-request="appRequest" />
                 </div>
             </div>
@@ -177,6 +195,12 @@ const latestHistoryForUpload = computed(() => {
             :app-request="appRequest"
             :history="latestHistoryForUpload"
             @close="showingAddImageSupportModal = false"
+        />
+        <AddSupportingNoteModal
+            :show="showingAddNoteModal"
+            :app-request="appRequest"
+            :note-to-edit="noteToEdit"
+            @close="showingAddNoteModal = false"
         />
         <VerifyDocSupportModal
             :show="showingVerifyDocModal"

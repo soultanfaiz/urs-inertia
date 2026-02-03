@@ -1,54 +1,74 @@
-# ----------------------------------------------------
-# STAGE 1: BUILD ASET FRONEND (Vue/Inertia)
-# ----------------------------------------------------
-FROM node:20-alpine AS frontend_builder
-
+# --- STAGE 1: Build Backend Dependencies (Composer) ---
+# Kita jalankan Composer DULUAN agar folder 'vendor' terbentuk
+FROM composer:2 as composer_build
 WORKDIR /app
+COPY composer.json composer.lock ./
+# Install dependensi PHP
+RUN composer install --no-dev --optimize-autoloader --no-scripts --prefer-dist
 
-# Copy package files dan install Node dependencies
-COPY package.json yarn.lock ./
-RUN yarn install --frozen-lockfile
+# --- STAGE 2: Build Frontend Assets (Node.js) ---
+# Sekarang baru kita jalankan Node.js
+FROM node:20 as node_build
+WORKDIR /app
+COPY package*.json ./
+RUN npm install
 
-# Copy seluruh kode aplikasi
+# Salin seluruh kode
 COPY . .
 
-# Jalankan build assets Inertia/Vue
-RUN yarn build
+# [PENTING] Salin folder vendor dari STAGE 1 ke sini
+# Agar Vite bisa menemukan "../../vendor/tightenco/ziggy"
+COPY --from=composer_build /app/vendor /app/vendor
 
-# ----------------------------------------------------
-# STAGE 2: BUILD IMAGE PRODUKSI (PHP-FPM untuk Laravel)
-# ----------------------------------------------------
-FROM php:8.2-fpm-alpine AS production
+# Build aset Vite
+RUN npm run build
 
-# Install OS dependencies dan PHP extensions yang diperlukan
-# Untuk Neon (PostgreSQL), kita perlu pdo_pgsql
-RUN apk add --no-cache \
-    postgresql-dev \
-    && docker-php-ext-install pdo pdo_pgsql
+# --- STAGE 3: Final Production Image (PHP + Apache) ---
+FROM php:8.2-apache
 
-# Install Composer
-COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
+# Install library sistem
+RUN apt-get update && apt-get install -y \
+    libpq-dev \
+    libzip-dev \
+    libicu-dev \
+    libpng-dev \
+    libjpeg-dev \
+    libfreetype6-dev \
+    unzip \
+    git \
+    && docker-php-ext-configure gd --with-freetype --with-jpeg \
+    && docker-php-ext-install pdo pdo_pgsql bcmath intl zip opcache gd
 
+# Aktifkan mod_rewrite
+RUN a2enmod rewrite
+
+# Ubah DocumentRoot Apache
+ENV APACHE_DOCUMENT_ROOT /var/www/html/public
+RUN sed -ri -e 's!/var/www/html!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/sites-available/*.conf
+RUN sed -ri -e 's!/var/www/html!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/apache2.conf
+
+# Set direktori kerja
 WORKDIR /var/www/html
 
-# Copy semua file source code
+# Salin kode aplikasi
 COPY . .
 
-# Copy aset yang sudah di-build dari Stage 1
-# Sesuaikan path public/build jika Anda menggunakan Vite
-COPY --from=frontend_builder /app/public/build public/build
+# Salin folder vendor dari STAGE 1 (Backend dependencies)
+COPY --from=composer_build /app/vendor /var/www/html/vendor
 
-# Instalasi Composer dependencies (hanya untuk produksi)
-RUN composer install --no-dev --optimize-autoloader
+# Salin folder public/build dari STAGE 2 (Frontend assets)
+COPY --from=node_build /app/public/build /var/www/html/public/build
 
-# Buat folder cache dan log, dan set permission
-RUN chown -R www-data:www-data /var/www/html/storage \
-    && chown -R www-data:www-data /var/www/html/bootstrap/cache \
-    && chmod -R 775 /var/www/html/storage \
-    && chmod -R 775 /var/www/html/bootstrap/cache
+# Atur hak akses
+RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
+RUN chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache
 
-# Expose port 9000 (port default FPM)
-EXPOSE 9000
+# Expose Port 8080
+EXPOSE 8080
+RUN sed -i 's/80/8080/g' /etc/apache2/sites-available/000-default.conf /etc/apache2/ports.conf
 
-# Perintah utama untuk menjalankan PHP-FPM
-CMD ["php-fpm"]
+# Command Start
+CMD php artisan config:cache && \
+    php artisan route:cache && \
+    php artisan view:cache && \
+    apache2-foreground

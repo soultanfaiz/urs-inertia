@@ -17,6 +17,8 @@ use Inertia\Inertia;
 use Illuminate\Routing\Controller;
 use Cloudinary\Api\Upload\UploadApi;
 use Illuminate\Support\Str;
+use App\Http\Traits\NotifiesOnHistoryCreation;
+use Barryvdh\DomPDF\Facade\Pdf;
 
 class AppRequestController extends Controller
 {
@@ -25,6 +27,8 @@ class AppRequestController extends Controller
      *
      * @return void
      */
+    use NotifiesOnHistoryCreation;
+
     public function __construct()
     {
         $this->middleware('auth');
@@ -33,20 +37,50 @@ class AppRequestController extends Controller
     /**
      * Menampilkan daftar permohonan.
      */
-    public function index()
+    public function index(Request $request)
     {
+        // Helper untuk menerapkan filter pencarian -- REMOVED for Client-Side Search Optimization
+        // We now fetch ALL records and filter on the client.
+
         // Ambil data permohonan berdasarkan role
-        $appRequestsQuery = AppRequest::with('user')->latest();
+        // Sort by nearest incomplete development activity due date
+        $nearestActivitySubquery = \App\Models\DevelopmentActivity::selectRaw('app_request_id, MIN(end_date) as nearest_due_date')
+            ->where('is_completed', false)
+            ->groupBy('app_request_id');
+
+        $appRequestsQuery = AppRequest::with(['user', 'developmentActivities'])
+            ->select('app_requests.*')
+            ->leftJoinSub($nearestActivitySubquery, 'nearest_activities', function ($join) {
+                $join->on('app_requests.id', '=', 'nearest_activities.app_request_id');
+            })
+            ->orderByRaw('nearest_activities.nearest_due_date IS NULL')  // NULL values last
+            ->orderBy('nearest_activities.nearest_due_date', 'asc')
+            ->orderBy('app_requests.updated_at', 'desc');  // Secondary sort
 
         if (!auth()->user()->hasRole('admin')) {
-            $appRequestsQuery->where('user_id', auth()->id());
+            // Jika bukan admin, tampilkan semua permohonan dari instansi yang sama.
+            $appRequestsQuery->where('instansi', auth()->user()->instansi);
         }
 
-        $appRequests = $appRequestsQuery->paginate(10)->withQueryString();
+        // FETCH ALL DATA (No Pagination, No Server-Side Filtering)
+        $appRequests = $appRequestsQuery->get();
+
+        // Ambil semua data ringkas untuk keperluan checklist laporan
+        // Optimization: $appRequests already contains everything we need, but maybe we keep this 
+        // separate query if 'allRequestsForReport' needs specific columns or formatting? 
+        // actually $appRequests has everything. We can re-use it or just keep this lightweight query for the modal.
+        // Let's keep existing logic for reports to stay safe, but we modified the main one.
+
+        $reportQuery = AppRequest::select('id', 'title', 'instansi', 'created_at', 'status')->latest('updated_at');
+        if (!auth()->user()->hasRole('admin')) {
+            $reportQuery->where('instansi', auth()->user()->instansi);
+        }
+        $allRequestsForReport = $reportQuery->get();
 
         // Render komponen Vue 'AppRequest/Index' dan kirimkan data sebagai props
         return Inertia::render('AppRequest/Index', [
-            'appRequests' => $appRequests,
+            'appRequests' => $appRequests, // Now a Collection/Array, not a LengthAwarePaginator
+            'allRequestsForReport' => $allRequestsForReport,
         ]);
     }
 
@@ -69,45 +103,67 @@ class AppRequestController extends Controller
      */
     public function store(Request $request)
     {
-        $validatedData = $request->validate([
+        $user = auth()->user();
+        $isAdmin = $user->hasRole('admin');
+
+        $rules = [
             'title' => 'required|string|max:255',
             'description' => 'required|string',
-            'instansi' => ['required', new Enum(Instansi::class)],
-            'file_pdf' => 'required|file|mimes:pdf|max:2048',
-        ]);
+        ];
 
+        // Jika admin, instansi wajib diisi dari form dan file_pdf opsional.
+        if ($isAdmin) {
+            $rules['instansi'] = ['required', new Enum(Instansi::class)];
+            $rules['file_pdf'] = 'nullable|file|mimes:pdf|max:2048';
+        } else {
+            // Jika user biasa, file_pdf wajib.
+            $rules['file_pdf'] = 'required|file|mimes:pdf|max:2048';
+        }
 
-        try {
-            // Upload menggunakan Library Native (bukan Facade Laravel)
-            $upload = (new UploadApi())->upload($request->file('file_pdf')->getRealPath(), [
-                'folder' => 'pdfs',
-                'resource_type' => 'raw',
-                'upload_preset' => 'urs-inertia' // Opsional
-            ]);
+        $validatedData = $request->validate($rules);
 
-            // Ambil URL (Gunakan kurung siku [] karena hasilnya Array)
-            $path = $upload['secure_url'];
-        } catch (\Exception $e) {
-            return back()->withErrors(['file_pdf' => 'Gagal Upload: ' . $e->getMessage()])->withInput();
+        // Jika bukan admin, ambil instansi dari data user, abaikan input form.
+        $instansi = $isAdmin ? $validatedData['instansi'] : $user->instansi;
+
+        $path = null;
+        $fileName = null;
+
+        if ($request->hasFile('file_pdf')) {
+            try {
+                // Upload menggunakan Library Native (bukan Facade Laravel)
+                $upload = (new UploadApi())->upload($request->file('file_pdf')->getRealPath(), [
+                    'folder' => 'pdfs',
+                    'resource_type' => 'raw',
+                ]);
+
+                // Ambil URL (Gunakan kurung siku [] karena hasilnya Array)
+                $path = $upload['secure_url'];
+                $fileName = $request->file('file_pdf')->getClientOriginalName();
+            } catch (\Exception $e) {
+                return back()->withErrors(['file_pdf' => 'Gagal Upload: ' . $e->getMessage()])->withInput();
+            }
         }
         // --- SELESAI CONFIG MANUAL ---
 
         $appRequest = AppRequest::create([
-            'user_id' => auth()->id(),
+            'user_id' => $user->id,
             'title' => $validatedData['title'],
             'description' => $validatedData['description'],
             'start_date' => now(),
             'end_date' => now()->addMonth(),
-            'instansi' => $validatedData['instansi'],
-            'file_path' => $path, // Path yang didapat dari manual upload
+            'instansi' => $instansi,
+            'file_path' => $path, // Bisa null jika admin tidak upload
+            'file_name' => $fileName, // Bisa null
             'status' => RequestStatus::PERMOHONAN,
             'verification_status' => VerificationStatus::MENUNGGU,
         ]);
 
-        $appRequest->histories()->create([
+        $history = $appRequest->histories()->create([
             'user_id' => auth()->id(),
             'status' => RequestStatus::PERMOHONAN,
         ]);
+
+        $this->sendNotificationForHistory($appRequest, $history);
 
         return redirect()->route('app-requests.index')->with('success', 'Permohonan berhasil diajukan!');
     }
@@ -117,7 +173,7 @@ class AppRequestController extends Controller
      */
     public function show(AppRequest $appRequest)
     {
-        if (auth()->user()->id !== $appRequest->user_id && !auth()->user()->hasRole('admin')) {
+        if (auth()->user()->instansi !== $appRequest->instansi->value && !auth()->user()->hasRole('admin')) {
             abort(403, 'Anda tidak diizinkan untuk melihat permohonan ini.');
         }
 
@@ -126,15 +182,20 @@ class AppRequestController extends Controller
             'histories' => function ($query) {
                 $query->orderBy('created_at', 'desc')->orderBy('id', 'desc')->with(['user', 'docSupports', 'imageSupports']);
             },
-            'developmentActivities.subActivities'
+            'developmentActivities.subActivities',
+            'supportingNotes.user' // Load relasi catatan pendukung beserta user-nya
         ]);
 
         // Untuk debugging: Cek apakah data aktivitas pengembangan berhasil dimuat.
         // dd($appRequest->developmentActivities);
 
+        // Ambil semua data PIC
+        $pics = \App\Models\Pic::all();
+
         // Render komponen Vue 'AppRequest/Show'
         return Inertia::render('AppRequest/Show', [
             'appRequest' => $appRequest,
+            'pics' => $pics,
         ]);
     }
 
@@ -176,12 +237,14 @@ class AppRequestController extends Controller
 
             $appRequest->update($updateData);
 
-            $appRequest->histories()->create([
+            $history = $appRequest->histories()->create([
                 'user_id' => auth()->id(),
                 // Catat status progres di riwayat
                 'status' => $newStatus,
                 'reason' => $validated['reason'] ?? null,
             ]);
+
+            $this->sendNotificationForHistory($appRequest, $history);
         });
 
         // Inertia akan secara otomatis menangani redirect ini dengan benar pada request XHR (AJAX).
@@ -195,8 +258,8 @@ class AppRequestController extends Controller
 
     public function storeDocSupport(Request $request, AppRequest $appRequest, RequestHistory $history)
     {
-        // Otorisasi: Hanya admin atau pemilik permohonan yang bisa menambahkan dokumen pendukung.
-        if (!auth()->user()->hasRole('admin') && auth()->id() !== $appRequest->user_id) {
+        // Otorisasi: Hanya admin atau user dari instansi yang sama yang bisa menambahkan dokumen pendukung.
+        if (!auth()->user()->hasRole('admin') && auth()->user()->instansi !== $appRequest->instansi->value) {
             abort(403, 'Anda tidak diizinkan menambahkan dokumen pendukung untuk permohonan ini.');
         }
 
@@ -206,7 +269,7 @@ class AppRequestController extends Controller
 
         // ... (Kode validasi sebelumnya tetap sama)
         $validated = $request->validate([
-            'file_support_pdf' => 'required|file|mimes:pdf|max:2048',
+            'file_support_pdf' => 'required|file|mimes:pdf|max:5000',
         ]);
 
         $file = $request->file('file_support_pdf');
@@ -247,8 +310,8 @@ class AppRequestController extends Controller
      */
     public function storeImageSupport(Request $request, AppRequest $appRequest, RequestHistory $history)
     {
-        // Otorisasi: Hanya admin atau pemilik permohonan yang bisa menambahkan bukti gambar.
-        if (!auth()->user()->hasRole('admin') && auth()->id() !== $appRequest->user_id) {
+        // Otorisasi: Hanya admin atau user dari instansi yang sama yang bisa menambahkan bukti gambar.
+        if (!auth()->user()->hasRole('admin') && auth()->user()->instansi !== $appRequest->instansi->value) {
             abort(403, 'Anda tidak diizinkan menambahkan bukti gambar untuk permohonan ini.');
         }
 
@@ -294,7 +357,7 @@ class AppRequestController extends Controller
      */
     public function download(AppRequest $appRequest)
     {
-        if (auth()->user()->id !== $appRequest->user_id && !auth()->user()->hasRole('admin')) {
+        if (auth()->user()->instansi !== $appRequest->instansi->value && !auth()->user()->hasRole('admin')) {
             abort(403, 'Anda tidak diizinkan mengakses file ini.');
         }
         if (!$appRequest->file_path) {
@@ -303,32 +366,32 @@ class AppRequestController extends Controller
 
         $url = $appRequest->file_path;
 
-    // Cek safety: Jika URL kosong
-    if (empty($url)) {
-        abort(404, 'Link file tidak ditemukan di database.');
-    }
+        // Cek safety: Jika URL kosong
+        if (empty($url)) {
+            abort(404, 'Link file tidak ditemukan di database.');
+        }
 
- $response = Http::withoutVerifying()->get($url);
+        $response = Http::withoutVerifying()->get($url);
 
-    if ($response->failed()) {
-        // Jika error, kita tampilkan pesan debug biar tahu kenapa
-        return response()->json([
-            'message' => 'Gagal mengambil file dari Cloudinary',
-            'status' => $response->status(),
-            'target_url' => $url // Kita cek URL apa yang sebenarnya diakses
-        ], 404);
-    }
+        if ($response->failed()) {
+            // Jika error, kita tampilkan pesan debug biar tahu kenapa
+            return response()->json([
+                'message' => 'Gagal mengambil file dari Cloudinary',
+                'status' => $response->status(),
+                'target_url' => $url // Kita cek URL apa yang sebenarnya diakses
+            ], 404);
+        }
 
 
-    // 4. Buat Nama File yang Bagus
-    $filename = 'Dokumen_' . str_replace([' ', '/'], '_', $appRequest->title ?? 'download') . '.pdf';
+        // 4. Buat Nama File yang Bagus
+        $filename = 'Dokumen_' . str_replace([' ', '/'], '_', $appRequest->title ?? 'download') . '.pdf';
 
-    // 5. Kirim ke Browser User
-    return response()->streamDownload(function () use ($response) {
-        echo $response->body();
-    }, $filename, [
-        'Content-Type' => 'application/pdf',
-    ]);
+        // 5. Kirim ke Browser User
+        return response()->streamDownload(function () use ($response) {
+            echo $response->body();
+        }, $filename, [
+            'Content-Type' => 'application/pdf',
+        ]);
     }
 
     /**
@@ -349,12 +412,14 @@ class AppRequestController extends Controller
             $verificationStatus = VerificationStatus::from($validated['verification_status']);
             $appRequest->verification_status = $verificationStatus;
 
-            $appRequest->histories()->create([
+            $verificationHistory = $appRequest->histories()->create([
                 'user_id' => auth()->id(),
                 'status' => $verificationStatus->value,
                 'type' => 'verification', // Tambahkan baris ini
                 'reason' => $validated['reason'] ?? null,
             ]);
+
+            $this->sendNotificationForHistory($appRequest, $verificationHistory);
 
             if ($verificationStatus === VerificationStatus::DISETUJUI) {
                 $allStatuses = RequestStatus::cases();
@@ -362,11 +427,12 @@ class AppRequestController extends Controller
                 if ($currentIndex !== false && isset($allStatuses[$currentIndex + 1])) {
                     $nextStatus = $allStatuses[$currentIndex + 1];
                     $appRequest->status = $nextStatus;
-                    $appRequest->histories()->create([
+                    $statusHistory = $appRequest->histories()->create([
                         'user_id' => auth()->id(),
                         'status' => $nextStatus->value,
                         'reason' => 'Status otomatis naik setelah verifikasi disetujui.',
                     ]);
+                    $this->sendNotificationForHistory($appRequest, $statusHistory);
                 }
             }
 
@@ -385,10 +451,10 @@ class AppRequestController extends Controller
      */
     public function downloadDocSupport(RequestDocSupport $docSupport)
     {
-      // 1. Otorisasi
+        // 1. Otorisasi
         $appRequest = $docSupport->requestHistory->appRequest;
 
-        if (auth()->user()->id !== $appRequest->user_id && !auth()->user()->hasRole('admin')) {
+        if (auth()->user()->instansi !== $appRequest->instansi->value && !auth()->user()->hasRole('admin')) {
             abort(403, 'Anda tidak diizinkan mengakses file ini.');
         }
 
@@ -428,7 +494,7 @@ class AppRequestController extends Controller
     {
         $appRequest = $imageSupport->requestHistory->appRequest;
 
-        if (auth()->user()->id !== $appRequest->user_id && !auth()->user()->hasRole('admin')) {
+        if (auth()->user()->instansi !== $appRequest->instansi->value && !auth()->user()->hasRole('admin')) {
             abort(403, 'Anda tidak diizinkan mengakses gambar ini.');
         }
 
@@ -509,5 +575,35 @@ class AppRequestController extends Controller
         // Redirect kembali ke halaman detail permohonan
         return redirect()->route('app-requests.show', $imageSupport->requestHistory->appRequest)
             ->with('success', 'Status gambar pendukung berhasil diperbarui!');
+    }
+
+    /**
+     * Membuat laporan PDF berdasarkan checklist.
+     */
+    public function generateReport(Request $request)
+    {
+        $request->validate([
+            'request_ids' => 'required|array|min:1',
+            'request_ids.*' => 'exists:app_requests,id',
+        ]);
+
+        $requests = AppRequest::with([
+            'user',
+            'histories.docSupports',
+            'histories.imageSupports'
+        ])
+            ->whereIn('id', $request->request_ids)
+            ->latest()
+            ->get();
+
+        // Otorisasi tambahan: filter jika bukan admin
+        if (!auth()->user()->hasRole('admin')) {
+            $requests = $requests->filter(fn($req) => $req->instansi->value === auth()->user()->instansi);
+        }
+
+        $pdf = Pdf::loadView('reports.app_requests', ['requests' => $requests])
+            ->setPaper('a4', 'portrait')
+            ->setOptions(['isRemoteEnabled' => true]); // Penting agar gambar dari URL bisa muncul
+        return $pdf->stream('Laporan_Permohonan_' . now()->format('Ymd_His') . '.pdf');
     }
 }

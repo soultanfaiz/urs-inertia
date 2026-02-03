@@ -1,0 +1,5 @@
+# buildpack.yaml
+apiVersion: 1
+buildpacks:
+  - google.nodejs.npm
+  - google.php.web

@@ -36,7 +36,7 @@ const placeholderImage = '/storage/placeholder.png';
             <header class="flex justify-between items-center">
                 <div class="flex items-center space-x-2">
                     <Link href="/" class="text-2xl font-bold text-gray-900">
-                        SIPP
+                        SIPAIS
                     </Link>
                 </div>
 
@@ -78,7 +78,7 @@ const placeholderImage = '/storage/placeholder.png';
                         <h1
                             class="text-4xl lg:text-5xl font-extrabold tracking-tight text-gray-900"
                         >
-                            Sistem Informasi Permohonan Aplikasi
+                            Sistem Informasi Permohonan Aplikasi Internal Samarinda
                         </h1>
                         <p class="mt-6 text-lg text-gray-600">
                             Ajukan permohonan pengembangan aplikasi dan pantau perkembangannya

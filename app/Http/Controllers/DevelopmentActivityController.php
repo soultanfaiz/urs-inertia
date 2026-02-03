@@ -7,6 +7,7 @@ use App\Models\DevelopmentActivity;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Routing\Controller;
+use Inertia\Inertia;
 
 
 
@@ -37,6 +38,8 @@ class DevelopmentActivityController extends Controller
             'sub_activities.*' => 'required|string|max:255',
             'start_date' => 'nullable|date',
             'end_date' => 'nullable|date|after_or_equal:start_date',
+            'pic' => 'nullable|array', // Validasi array
+            'pic.*' => 'exists:pics,id', // Validasi setiap item di array
         ]);
 
         $activity = DB::transaction(function () use ($appRequest, $validated) {
@@ -50,6 +53,7 @@ class DevelopmentActivityController extends Controller
                 'start_date' => $validated['start_date'] ?? null,
                 'end_date' => $validated['end_date'] ?? null,
                 'iteration_count' => $newIteration,
+                'pic' => $validated['pic'] ?? [], // Simpan array PIC
             ];
 
             $activity = $appRequest->developmentActivities()->create($activityData);
@@ -85,11 +89,14 @@ class DevelopmentActivityController extends Controller
                 'description' => 'required|string',
                 'start_date' => 'nullable|date',
                 'end_date' => 'nullable|date|after_or_equal:start_date',
+                'pic' => 'nullable|array',
+                'pic.*' => 'exists:pics,id',
             ]);
 
             // Prepare update data
             $updateData = [
                 'description' => $validated['description'],
+                'pic' => $validated['pic'] ?? [],
             ];
 
             // Add dates (handle empty string as null)
@@ -274,5 +281,72 @@ class DevelopmentActivityController extends Controller
         // Dengan Inertia/Vue, kirim kembali data aktivitas yang sudah di-load relasinya.
         // Frontend akan menggunakan data ini untuk me-refresh komponen.
         return response()->json(['activity' => $activity->load('subActivities')]);
+    }
+    /**
+     * Menampilkan daftar semua aktivitas pengembangan yang belum selesai.
+     */
+    public function index()
+    {
+        if (!auth()->user()->hasRole('admin')) {
+            abort(403, 'Hanya admin yang dapat mengakses halaman ini.');
+        }
+
+        $activities = DevelopmentActivity::with('appRequest')
+            ->where('is_completed', false)
+            ->orderByRaw('CASE WHEN end_date IS NULL THEN 1 ELSE 0 END, end_date ASC')
+            ->get();
+
+        // Ambil semua PIC
+        $allPics = \App\Models\Pic::all();
+
+        // Kumpulkan semua ID PIC yang sedang mengerjakan tugas (aktivitas belum selesai)
+        $busyPicIds = collect();
+        foreach ($activities as $activity) {
+            if (!empty($activity->pic) && is_array($activity->pic)) {
+                $busyPicIds = $busyPicIds->merge($activity->pic);
+            }
+        }
+        $busyPicIds = $busyPicIds->unique()->values()->all();
+
+        // Filter PIC yang tidak sedang mengerjakan tugas
+        $availablePics = $allPics->filter(function ($pic) use ($busyPicIds) {
+            return !in_array($pic->id, $busyPicIds);
+        })->values();
+
+        return Inertia::render('DevelopmentActivity/Index', [
+            'activities' => $activities,
+            'availablePics' => $availablePics,
+            'pics' => $allPics,
+            'appRequests' => AppRequest::where('status', '!=', \App\Enums\RequestStatus::SELESAI)
+                ->where('verification_status', '!=', \App\Enums\VerificationStatus::DITOLAK)
+                ->orderBy('created_at', 'desc')
+                ->get(),
+        ]);
+    }
+
+    /**
+     * Menugaskan PIC ke aktivitas pengembangan.
+     */
+    public function assignPic(Request $request)
+    {
+        if (!auth()->user()->hasRole('admin')) {
+            abort(403, 'Hanya admin yang dapat melakukan verifikasi.');
+        }
+
+        $validated = $request->validate([
+            'activity_id' => 'required|exists:development_activities,id',
+            'pic_id' => 'required|exists:pics,id',
+        ]);
+
+        $activity = DevelopmentActivity::findOrFail($validated['activity_id']);
+
+        $currentPics = $activity->pic ?? [];
+        if (!in_array($validated['pic_id'], $currentPics)) {
+            $currentPics[] = $validated['pic_id'];
+            $activity->pic = $currentPics;
+            $activity->save();
+        }
+
+        return redirect()->back()->with('success', 'PIC berhasil ditugaskan.');
     }
 }
