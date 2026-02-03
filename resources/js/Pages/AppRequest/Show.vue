@@ -22,6 +22,10 @@ const props = defineProps({
     appRequest: {
         type: Object,
         required: true,
+    },
+    pics: {
+        type: Array,
+        default: () => [],
     }
 });
 
@@ -162,7 +166,7 @@ const latestHistoryForUpload = computed(() => {
                         @open-add-note-modal="openAddNoteModal"
                         @open-edit-note-modal="openEditNoteModal"
                     />
-                    <DevelopmentActivityCard :app-request="appRequest" />
+                    <DevelopmentActivityCard :app-request="appRequest" :pics="pics" />
                     <RequestHistoryCard :app-request="appRequest" />
                 </div>
             </div>

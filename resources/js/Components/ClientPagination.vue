@@ -83,10 +83,10 @@ const handleClick = (link) => {
                  <button
                     v-else
                     type="button"
-                    class="mr-1 mb-1 px-4 py-3 text-sm leading-4 border rounded focus:border-indigo-500 focus:text-indigo-500"
+                    class="mr-1 mb-1 px-4 py-3 text-sm leading-4 border rounded focus:border-indigo-500"
                     :class="{ 
-                        'bg-blue-600 text-white hover:bg-blue-700': link.active,
-                        'bg-white text-gray-700 hover:bg-gray-50': !link.active && link.enabled,
+                        'bg-blue-600 text-white hover:bg-blue-700 focus:text-white': link.active,
+                        'bg-white text-gray-700 hover:bg-gray-50 focus:text-indigo-500': !link.active && link.enabled,
                         'bg-gray-100 text-gray-400 cursor-not-allowed': !link.enabled
                     }"
                     :disabled="!link.enabled"

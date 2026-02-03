@@ -9,6 +9,7 @@ use App\Http\Controllers\AIGeneratorController;
 use App\Http\Controllers\NotificationController;
 use Illuminate\Foundation\Application;
 use App\Http\Controllers\DevelopmentActivityController;
+use App\Http\Controllers\PicController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\File;
@@ -47,6 +48,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Rute untuk Development Activities (Hanya Admin)
     Route::middleware('role:admin')->group(function () {
         Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+        Route::get('/development-activities', [DevelopmentActivityController::class, 'index'])->name('development-activities.index');
+        Route::post('/development-activities/assign-pic', [DevelopmentActivityController::class, 'assignPic'])->name('development-activities.assign-pic');
         Route::post('/app-requests/{appRequest}/development-activities', [DevelopmentActivityController::class, 'store'])->name('app-request.development-activity.store');
         Route::patch('/development-activities/{developmentActivity}', [DevelopmentActivityController::class, 'update'])->name('development-activity.update');
         Route::delete('/development-activities/{developmentActivity}', [DevelopmentActivityController::class, 'destroy'])->name('development-activity.destroy');
@@ -73,6 +76,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::delete('/supporting-notes/{supportingNote}', [SupportingNoteController::class, 'destroy'])
             ->name('supporting-note.destroy');
 
+        // Manajemen
+        Route::get('/management/pics', [PicController::class, 'index'])->name('management.pics.index');
+        Route::post('/management/pics', [PicController::class, 'store'])->name('management.pics.store');
+        Route::patch('/management/pics/{pic}', [PicController::class, 'update'])->name('management.pics.update');
+        Route::delete('/management/pics/{pic}', [PicController::class, 'destroy'])->name('management.pics.destroy');
     });
 
     // Rute untuk laporan catatan pendukung (dapat diakses admin dan user terkait)

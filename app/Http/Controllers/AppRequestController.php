@@ -189,9 +189,13 @@ class AppRequestController extends Controller
         // Untuk debugging: Cek apakah data aktivitas pengembangan berhasil dimuat.
         // dd($appRequest->developmentActivities);
 
+        // Ambil semua data PIC
+        $pics = \App\Models\Pic::all();
+
         // Render komponen Vue 'AppRequest/Show'
         return Inertia::render('AppRequest/Show', [
             'appRequest' => $appRequest,
+            'pics' => $pics,
         ]);
     }
 

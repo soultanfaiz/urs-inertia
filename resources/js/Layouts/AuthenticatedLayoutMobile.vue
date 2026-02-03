@@ -72,6 +72,33 @@ const showingSidebar = ref(false);
                                 Permohonan
                             </NavLink>
                         </li>
+                        <li v-if="isAdmin">
+                            <NavLink
+                                :href="route('development-activities.index')"
+                                :active="page.component.startsWith('DevelopmentActivity')"
+                                class="flex w-full items-center px-6 py-3 text-left transition-colors duration-200"
+                                active-class="bg-blue-50 border-l-4 border-blue-500 text-blue-700"
+                                inactive-class="text-gray-600 hover:bg-gray-50 hover:text-gray-900 border-l-4 border-transparent"
+                                @click="showingSidebar = false"
+                            >
+                                Task
+                            </NavLink>
+                        </li>
+                        <li v-if="isAdmin">
+                             <div class="px-6 pt-4 pb-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                                Manajemen
+                            </div>
+                            <NavLink
+                                :href="route('management.pics.index')"
+                                :active="page.component.startsWith('Management/Pic')"
+                                class="flex w-full items-center px-6 py-3 text-left transition-colors duration-200"
+                                active-class="bg-blue-50 border-l-4 border-blue-500 text-blue-700"
+                                inactive-class="text-gray-600 hover:bg-gray-50 hover:text-gray-900 border-l-4 border-transparent"
+                                @click="showingSidebar = false"
+                            >
+                                Manajemen PIC
+                            </NavLink>
+                        </li>
                     </ul>
                 </nav>
             </div>

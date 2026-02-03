@@ -4,10 +4,15 @@ import { usePage, useForm } from '@inertiajs/vue3';
 import axios from 'axios';
 import { format, parseISO, isPast, differenceInDays, formatDistanceToNow } from 'date-fns'; // Corrected import
 import { id as idLocale } from 'date-fns/locale';
+import MultiSelect from '@/Components/MultiSelect.vue';
 
 const props = defineProps({
     appRequest: {
         type: Object,
+        required: true,
+    },
+    pics: {
+        type: Array,
         required: true,
     },
 });
@@ -15,6 +20,13 @@ const props = defineProps({
 const user = computed(() => usePage().props.auth.user);
 const isAdmin = computed(() => user.value?.roles?.some(role => role.name === 'admin'));
 const enums = computed(() => usePage().props.enums);
+
+const picOptions = computed(() => {
+    return (props.pics || []).map(pic => ({
+        value: pic.id,
+        label: `${pic.name} - ${pic.position}`
+    }));
+});
 
 const shouldShowCard = computed(() => {
     const status = props.appRequest.status;
@@ -37,6 +49,7 @@ const newActivityForm = useForm({
     sub_activities: [''],
     start_date: '',
     end_date: '',
+    pic: [], // Add pic array
 });
 
 const editForms = ref({}); // Holds a form for each activity being edited
@@ -44,61 +57,17 @@ const newSubActivityForms = ref({}); // Holds a form for each activity's new sub
 
 // --- Helper Functions ---
 const getDeadlineInfo = (activity) => {
-    if (!activity.end_date) return null;
-
-    const deadline = parseISO(activity.end_date);
-    const isOverdue = isPast(deadline) && !activity.is_completed;
-
-    // Check if the difference is less than or equal to 7 days but not in the past
-    const now = new Date();
-    const diffDays = differenceInDays(deadline, now);
-    const isNear = !isOverdue && diffDays >= 0 && diffDays <= 7;
-
-    const textColor = computed(() => {
-        if (isOverdue) return 'text-red-600';
-        if (isNear) return 'text-yellow-600';
-        return 'text-gray-500';
-    });
-
-    const statusText = computed(() => {
-        const distance = formatDistanceToNow(deadline, { addSuffix: true, locale: idLocale });
-        return isOverdue ? '(melewati deadline)' : `(${distance})`;
-    });
-
-    return {
-        date: format(deadline, 'd MMM yyyy HH:mm', { locale: idLocale }),
-        status: statusText.value,
-        textColor: textColor.value,
-        isOverdue: isOverdue,
-    };
+// ...
 };
 
-// --- Methods ---
-
-// Initialize and watch for prop changes
-watch(() => props.appRequest.development_activities, (newActivities) => {
-    activities.value = (newActivities || [])
-        .map(activity => ({
-            ...activity,
-            open: activity.sub_activities?.some(s => !s.is_completed) ?? false,
-        }))
-        .sort((a, b) => a.iteration_count - b.iteration_count);
-}, { immediate: true, deep: true });
-
-
-const toggleEditMode = () => {
-    isEditingAll.value = !isEditingAll.value;
-    // If we exit edit mode, clear all edit forms
-    if (!isEditingAll.value) {
-        editForms.value = {};
-    }
-};
+// ...
 
 const startEdit = (activity) => {
     editForms.value[activity.id] = useForm({
         description: activity.description,
         start_date: activity.start_date ? format(parseISO(activity.start_date), "yyyy-MM-dd'T'HH:mm") : '',
         end_date: activity.end_date ? format(parseISO(activity.end_date), "yyyy-MM-dd'T'HH:mm") : '',
+        pic: activity.pic || [], // Initialize with existing pics
     });
 };
 
@@ -138,7 +107,8 @@ const saveEdit = async (activityId) => {
             // then `startEdit` calls `parseISO` -> `format`. It works.
             
             if (payload.start_date) activity.start_date = payload.start_date; 
-            if (payload.end_date) activity.end_date = payload.end_date; 
+            if (payload.end_date) activity.end_date = payload.end_date;
+            if (payload.pic) activity.pic = payload.pic; // Update local PIC state
         }
 
         // Close the edit form
@@ -242,6 +212,7 @@ const saveNewActivity = () => {
             onSuccess: () => {
                 newActivityForm.reset();
                 newActivityForm.sub_activities = ['']; // Reset to one empty field
+                newActivityForm.pic = []; // Reset PIC
                 showNewActivityForm.value = false; // Hide form on success
             }
         });
@@ -284,6 +255,17 @@ const handleDrop = async (event, targetIndex) => {
     }
 };
 
+
+
+// --- Helper for PIC Names ---
+const getPicNames = (picIds) => {
+    if (!picIds || !Array.isArray(picIds) || picIds.length === 0) return '';
+    return picIds.map(id => {
+        const pic = props.pics.find(p => p.id === id);
+        return pic ? pic.name : 'Unknown';
+    }).join(', ');
+};
+
 </script>
 <template>
     <div v-if="shouldShowCard" class="p-4 sm:p-6 bg-white rounded-lg shadow">
@@ -320,6 +302,14 @@ const handleDrop = async (event, targetIndex) => {
                                         <label class="text-xs text-gray-600">Selesai (Deadline)</label>
                                         <input type="datetime-local" v-model="editForms[activity.id].end_date" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
                                     </div>
+                                    <div class="col-span-1 md:col-span-2">
+                                        <label class="text-xs text-gray-600 mb-1 block">PIC</label>
+                                        <MultiSelect
+                                            v-model="editForms[activity.id].pic"
+                                            :options="picOptions"
+                                            placeholder="Pilih PIC..."
+                                        />
+                                    </div>
                                 </div>
                                 <div class="flex items-center gap-2 mt-2">
                                     <button type="submit" :disabled="editForms[activity.id].processing" class="inline-flex items-center px-3 py-1 text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md">
@@ -346,6 +336,12 @@ const handleDrop = async (event, targetIndex) => {
                                         <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium" :class="activity.is_completed ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'">
                                             {{ activity.is_completed ? 'Selesai' : 'Dalam Proses' }}
                                         </span>
+                                        <div v-if="activity.pic && activity.pic.length > 0" class="text-xs text-gray-600 flex items-center gap-1">
+                                             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                              </svg>
+                                             <span>{{ getPicNames(activity.pic) }}</span>
+                                        </div>
                                         <template v-if="getDeadlineInfo(activity) && !activity.is_completed">
                                             <div class="text-xs flex items-center" :class="getDeadlineInfo(activity).textColor">
                                                 <svg class="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.414-1.415L11 9.586V6z" clip-rule="evenodd"></path></svg>
@@ -461,6 +457,14 @@ const handleDrop = async (event, targetIndex) => {
                          <div>
                             <label for="new_end_date" class="block text-sm font-medium text-gray-700">Tanggal Selesai (Opsional)</label>
                             <input type="datetime-local" id="new_end_date" v-model="newActivityForm.end_date" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm">
+                        </div>
+                        <div class="col-span-1 md:col-span-2">
+                            <label class="block text-sm font-medium text-gray-700 mb-1">PIC (Opsional)</label>
+                            <MultiSelect
+                                v-model="newActivityForm.pic"
+                                :options="picOptions"
+                                placeholder="Pilih PIC..."
+                            />
                         </div>
                     </div>
                     <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-2 mt-4">

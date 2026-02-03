@@ -24,6 +24,7 @@ class DevelopmentActivity extends Model
         'start_date',
         'end_date',
         'is_completed',
+        'pic',
     ];
 
     /**
@@ -35,6 +36,7 @@ class DevelopmentActivity extends Model
         'is_completed' => 'boolean',
         'start_date' => 'datetime',
         'end_date' => 'datetime',
+        'pic' => 'array',
     ];
 
     /**
