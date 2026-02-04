@@ -49,6 +49,31 @@ const format_date = (value) => {
     return '-';
 }
 
+const get_deadline_color = (endDate) => {
+    if (!endDate) return 'text-gray-900';
+    
+    // Check if activity is completed (optional, if we have that data, but assuming strictly deadline based for now)
+    // If completed, maybe strictly green or gray? But user asked for due date warning.
+
+    const end = parseISO(endDate);
+    const now = new Date();
+    
+    // Check if past (overdue)
+    if (isPast(end) && !isSameDay(end, now)) {
+        return 'text-red-600 font-bold';
+    }
+
+    const daysLeft = differenceInDays(end, now);
+
+    if (daysLeft <= 1) { // Today or Tomorrow
+         return 'text-red-600 font-bold'; // Urgent
+    } else if (daysLeft <= 3) {
+         return 'text-yellow-600 font-semibold'; // Warning
+    } else {
+         return 'text-green-600'; // Safe
+    }
+};
+
 const showAssignModal = ref(false);
 const selectedPic = ref(null);
 
@@ -407,7 +432,7 @@ const changePage = (page) => {
                                             <td class="px-3 py-2 text-xs text-gray-900 break-words">
                                                 {{ activity.description }}
                                             </td>
-                                            <td class="px-3 py-2 text-xs text-gray-900 whitespace-nowrap">
+                                            <td class="px-3 py-2 text-xs whitespace-nowrap" :class="get_deadline_color(activity.end_date)">
                                                 {{ format_date(activity.end_date) }}
                                             </td>
                                             <td class="px-3 py-2 whitespace-nowrap text-xs font-medium text-center">
@@ -457,7 +482,7 @@ const changePage = (page) => {
                                         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                                         </svg>
-                                        Deadline: <span class="font-medium ml-1">{{ format_date(activity.end_date) }}</span>
+                                        Deadline: <span class="ml-1" :class="get_deadline_color(activity.end_date)">{{ format_date(activity.end_date) }}</span>
                                     </div>
                                 </div>
                             </div>
