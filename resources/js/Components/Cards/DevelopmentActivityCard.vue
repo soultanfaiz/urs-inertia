@@ -22,10 +22,20 @@ const isAdmin = computed(() => user.value?.roles?.some(role => role.name === 'ad
 const enums = computed(() => usePage().props.enums);
 
 const picOptions = computed(() => {
-    return (props.pics || []).map(pic => ({
+    const options = (props.pics || []).map(pic => ({
         value: pic.id,
         label: `${pic.name} - ${pic.position}`
     }));
+
+    // Add Instansi as an option if it exists
+    if (props.appRequest?.instansi) {
+        options.push({
+            value: props.appRequest.instansi,
+            label: `OPD Terkait: ${props.appRequest.instansi}`
+        });
+    }
+
+    return options;
 });
 
 const shouldShowCard = computed(() => {
@@ -36,8 +46,16 @@ const shouldShowCard = computed(() => {
 });
 
 // --- Local State ---
-const activities = ref([]);
+const activities = ref(props.appRequest.development_activities || []);
+
+watch(() => props.appRequest.development_activities, (newVal) => {
+    activities.value = newVal || [];
+}, { deep: true });
+
 const isEditingAll = ref(false);
+const toggleEditMode = () => {
+    isEditingAll.value = !isEditingAll.value;
+};
 const showNewActivityForm = ref(false);
 
 // --- Drag & Drop State ---
@@ -201,9 +219,17 @@ const removeSubActivityField = (index) => {
 };
 
 const saveNewActivity = () => {
+    // Filter out empty strings from sub_activities
+    const cleanSubActivities = newActivityForm.sub_activities.filter(s => s.trim() !== '');
+    
+    // Create a temporary form or modify data just for submission
+    // effectively we want to pass the cleaned array. 
+    // If it's empty, backend now accepts it.
+    
     newActivityForm
         .transform((data) => ({
             ...data,
+            sub_activities: cleanSubActivities,
             start_date: data.start_date ? new Date(data.start_date).toISOString() : null,
             end_date: data.end_date ? new Date(data.end_date).toISOString() : null,
         }))
@@ -259,11 +285,13 @@ const handleDrop = async (event, targetIndex) => {
 
 // --- Helper for PIC Names ---
 const getPicNames = (picIds) => {
-    if (!picIds || !Array.isArray(picIds) || picIds.length === 0) return '';
+    if (!picIds || !Array.isArray(picIds) || picIds.length === 0) return '-';
     return picIds.map(id => {
-        const pic = props.pics.find(p => p.id === id);
-        return pic ? pic.name : 'Unknown';
-    }).join(', ');
+        // Use loose equality to handle string/number ID mismatch
+        const pic = props.pics.find(p => p.id == id);
+        // Fallback to the ID itself if not found (for OPD names)
+        return pic ? pic.name : id;
+    }).filter(n => n).join(', ');
 };
 
 </script>

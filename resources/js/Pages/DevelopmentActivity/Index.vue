@@ -32,11 +32,11 @@ const props = defineProps({
 
 const get_pic_names = (picIds) => {
     if (!picIds || !Array.isArray(picIds) || picIds.length === 0) return '-';
-    if (!props.pics) return '-';
+    // if (!props.pics) return '-'; // Removed to allow fallback
     
     return picIds.map(id => {
         const pic = props.pics.find(p => p.id === id);
-        return pic ? pic.name : '';
+        return pic ? pic.name : id;
     }).filter(name => name).join(', ');
 };
 
@@ -147,6 +147,7 @@ const submitNewActivity = () => {
             ...data,
             start_date: data.start_date ? new Date(data.start_date).toISOString() : null,
             end_date: data.end_date ? new Date(data.end_date).toISOString() : null,
+            return_to_index: true,
         }))
         .post(route('app-request.development-activity.store', selectedAppRequest.value.id), {
             preserveScroll: true,
@@ -156,43 +157,119 @@ const submitNewActivity = () => {
         });
 };
 
+// --- Edit Task Workflow ---
+const showEditActivityModal = ref(false);
+const activityToEdit = ref(null);
+
+const editActivityForm = useForm({
+    description: '',
+    start_date: '',
+    end_date: '',
+    pic: [],
+});
+
+const openEditActivityModal = (activity) => {
+    activityToEdit.value = activity;
+    editActivityForm.description = activity.description;
+    // Format dates for input[type="datetime-local"]
+    editActivityForm.start_date = activity.start_date ? format(parseISO(activity.start_date), "yyyy-MM-dd'T'HH:mm") : '';
+    editActivityForm.end_date = activity.end_date ? format(parseISO(activity.end_date), "yyyy-MM-dd'T'HH:mm") : '';
+    editActivityForm.pic = activity.pic || [];
+    showEditActivityModal.value = true;
+};
+
+const closeEditActivityModal = () => {
+    showEditActivityModal.value = false;
+    activityToEdit.value = null;
+    editActivityForm.reset();
+};
+
+const submitEditActivity = () => {
+    if (!activityToEdit.value) return;
+
+    // Transform dates to ISO string
+    const payload = editActivityForm.data();
+    if (payload.start_date) payload.start_date = new Date(payload.start_date).toISOString();
+    if (payload.end_date) payload.end_date = new Date(payload.end_date).toISOString();
+
+    editActivityForm
+        .transform(() => payload)
+        .patch(route('development-activity.update', activityToEdit.value.id), {
+            preserveScroll: true,
+            onSuccess: () => {
+                closeEditActivityModal();
+            }
+        });
+};
+
 const picOptions = computed(() => {
-    return (props.pics || []).map(pic => ({
+    // Determine context: Add Modal (selectedAppRequest) or Edit Modal (activityToEdit)
+    const contextAppRequest = selectedAppRequest.value 
+        ? selectedAppRequest.value 
+        : (activityToEdit.value ? activityToEdit.value.app_request : null); 
+
+    // Base options from PICs
+    const options = (props.pics || []).map(pic => ({
         value: pic.id,
         label: `${pic.name} - ${pic.position}`
     }));
+
+    // If we have a context app request, add its Instansi
+    if (contextAppRequest?.instansi) {
+         options.push({
+            value: contextAppRequest.instansi,
+            label: `OPD Terkait: ${contextAppRequest.instansi}`
+        });
+    }
+
+    return options;
 });
 
 // --- Filter & Pagination Logic ---
 
 const search = ref('');
-const deadlineFilter = ref('');
+const filterStartDate = ref('');
+const filterEndDate = ref('');
+const picFilter = ref([]);
 const currentPage = ref(1);
 const itemsPerPage = 10;
 
 const filteredActivities = computed(() => {
     let result = props.activities;
 
-    // Filter by Deadline
-    if (deadlineFilter.value) {
-        const now = startOfDay(new Date());
+    // Filter by PIC
+    if (picFilter.value.length > 0) {
+        result = result.filter(activity => {
+            if (!activity.pic || !Array.isArray(activity.pic)) return false;
+            // Return true if activity has AT LEAST ONE of the selected PICs
+            return activity.pic.some(picId => picFilter.value.includes(picId));
+        });
+    }
+
+    // Filter by Date Range (Deadline)
+    if (filterStartDate.value || filterEndDate.value) {
         result = result.filter(activity => {
             if (!activity.end_date) return false;
             const endDate = parseISO(activity.end_date);
-            
-            if (deadlineFilter.value === 'overdue') {
-                return isPast(endDate) && !isSameDay(endDate, now);
-            } else if (deadlineFilter.value === 'today') {
-                return isSameDay(endDate, now);
-            } else if (deadlineFilter.value === 'week') {
-                const diff = differenceInDays(endDate, now);
-                return diff >= 0 && diff <= 7;
+            const end = startOfDay(endDate);
+
+            if (filterStartDate.value && filterEndDate.value) {
+                 const startFilter = startOfDay(parseISO(filterStartDate.value));
+                 const endFilter = startOfDay(parseISO(filterEndDate.value));
+                 // Check if activity deadline is within range [startFilter, endFilter]
+                 return end >= startFilter && end <= endFilter;
+            } else if (filterStartDate.value) {
+                const startFilter = startOfDay(parseISO(filterStartDate.value));
+                return end >= startFilter;
+            } else if (filterEndDate.value) {
+                const endFilter = startOfDay(parseISO(filterEndDate.value));
+                return end <= endFilter;
             }
             return true;
         });
     }
 
-    // Filter by Search (Title, Instansi, Description, PIC)
+    // Filter by Search (Title, Instansi, Description, PIC Names)
     if (search.value) {
         const query = search.value.toLowerCase();
         result = result.filter(activity => {
@@ -209,7 +286,7 @@ const filteredActivities = computed(() => {
 });
 
 // Reset page on filter change
-watch([search, deadlineFilter], () => {
+watch([search, filterStartDate, filterEndDate, picFilter], () => {
     currentPage.value = 1;
 });
 
@@ -249,19 +326,31 @@ const changePage = (page) => {
                 
                 <!-- Card Filter & Pencarian -->
                 <div class="bg-white p-4 shadow-sm sm:rounded-lg">
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
                         <!-- Input Search -->
                         <div class="md:col-span-2">
                             <input v-model="search" type="text" placeholder="Cari berdasarkan judul, instansi, deskripsi, atau PIC..." class="w-full border-gray-300 focus:border-blue-500 focus:ring-blue-500 rounded-md shadow-sm text-sm">
                         </div>
-                        <!-- Dropdown Deadline -->
+                        
+                        <!-- Filter PIC -->
                         <div>
-                            <select v-model="deadlineFilter" class="w-full border-gray-300 focus:border-blue-500 focus:ring-blue-500 rounded-md shadow-sm text-sm">
-                                <option value="">Semua Waktu</option>
-                                <option value="overdue">Terlewat (Overdue)</option>
-                                <option value="today">Hari Ini</option>
-                                <option value="week">7 Hari Kedepan</option>
-                            </select>
+                             <MultiSelect
+                                v-model="picFilter"
+                                :options="picOptions"
+                                placeholder="Filter by PIC..."
+                            />
+                        </div>
+
+                        <!-- Date Range Filter -->
+                        <div class="flex flex-col xl:flex-row items-stretch xl:items-center gap-2">
+                             <div class="flex-1 min-w-0">
+                                <input type="date" v-model="filterStartDate" class="w-full border-gray-300 focus:border-blue-500 focus:ring-blue-500 rounded-md shadow-sm text-sm h-[38px]" placeholder="Dari Tgl">
+                            </div>
+                            <span class="hidden xl:block text-gray-500">-</span>
+                             <span class="xl:hidden text-center text-gray-500 text-xs">sampai</span>
+                            <div class="flex-1 min-w-0">
+                                <input type="date" v-model="filterEndDate" class="w-full border-gray-300 focus:border-blue-500 focus:ring-blue-500 rounded-md shadow-sm text-sm h-[38px]" placeholder="Sampai Tgl">
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -283,47 +372,58 @@ const changePage = (page) => {
                                 <table class="min-w-full divide-y divide-gray-200">
                                     <thead class="bg-gray-50">
                                         <tr>
-                                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-10">
                                                 No
                                             </th>
-                                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                                Judul App Request
+                                            <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/4">
+                                                Judul Permohonan
                                             </th>
-                                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/6">
                                                 PIC
+                                            </th>   
+                                            <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/3">
+                                                Deskripsi Tugas
                                             </th>
-                                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                                Deskripsi Activity
+                                            <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-24">
+                                                Deadline
                                             </th>
-                                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                                End Date
-                                            </th>
-                                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            <th scope="col" class="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-20">
                                                 Aksi
                                             </th>
                                         </tr>
                                     </thead>
                                     <tbody class="bg-white divide-y divide-gray-200">
-                                        <tr v-for="(activity, index) in paginatedActivities" :key="activity.id">
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                        <tr v-for="(activity, index) in paginatedActivities" :key="activity.id" class="hover:bg-gray-50">
+                                            <td class="px-3 py-2 whitespace-nowrap text-xs text-gray-500 text-center">
                                                 {{ (currentPage - 1) * itemsPerPage + index + 1 }}
                                             </td>
-                                            <td class="px-6 py-4 text-sm text-gray-900">
+                                            <td class="px-3 py-2 text-xs text-gray-900 break-words">
                                                 {{ activity.app_request.title }}
+                                                <div class="text-[10px] text-gray-500">{{ activity.app_request.instansi }}</div>
                                             </td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                            <td class="px-3 py-2 text-xs text-gray-900 break-words">
                                                 {{ get_pic_names(activity.pic) }}
                                             </td>
-                                            <td class="px-6 py-4 text-sm text-gray-900">
+                                            <td class="px-3 py-2 text-xs text-gray-900 break-words">
                                                 {{ activity.description }}
                                             </td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                            <td class="px-3 py-2 text-xs text-gray-900 whitespace-nowrap">
                                                 {{ format_date(activity.end_date) }}
                                             </td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                                <Link :href="route('app-requests.show', activity.app_request.id)" class="text-blue-600 hover:text-blue-900">
-                                                    Lihat
-                                                </Link>
+                                            <td class="px-3 py-2 whitespace-nowrap text-xs font-medium text-center">
+                                                <div class="flex items-center justify-center gap-2">
+                                                    <button @click="openEditActivityModal(activity)" class="text-indigo-600 hover:text-indigo-900" title="Edit">
+                                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                                        </svg>
+                                                    </button>
+                                                    <Link :href="route('app-requests.show', activity.app_request.id)" class="text-blue-600 hover:text-blue-900" title="Lihat Detail">
+                                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                                        </svg>
+                                                    </Link>
+                                                </div>
                                             </td>
                                         </tr>
                                     </tbody>
@@ -332,17 +432,27 @@ const changePage = (page) => {
 
                             <!-- Mobile Card View -->
                             <div class="md:hidden space-y-4">
-                                <div v-for="(activity, index) in paginatedActivities" :key="activity.id" class="bg-gray-50 rounded-lg p-4 border border-gray-200 shadow-sm">
-                                    <div class="flex justify-between items-start mb-2">
-                                        <h4 class="text-base font-semibold text-gray-900 mb-1 flex-1">{{ activity.app_request.title }}</h4>
-                                        <Link :href="route('app-requests.show', activity.app_request.id)" class="text-blue-600 text-sm font-medium hover:underline ml-2">
-                                            Lihat
-                                        </Link>
+                                <div v-for="(activity, index) in paginatedActivities" :key="activity.id" class="bg-gray-50 rounded-lg p-4 border border-gray-200 shadow-sm relative">
+                                    <div class="flex justify-between items-start mb-2 pr-12">
+                                        <h4 class="text-sm font-semibold text-gray-900 mb-1 break-words">{{ activity.app_request.title }}</h4>
+                                    </div>
+                                    <div class="absolute top-4 right-4 flex gap-3 bg-white p-1 rounded-md shadow-sm border border-gray-100">
+                                            <button @click="openEditActivityModal(activity)" class="text-indigo-600 hover:text-indigo-900" title="Edit">
+                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                                </svg>
+                                            </button>
+                                            <Link :href="route('app-requests.show', activity.app_request.id)" class="text-blue-600 hover:text-blue-900" title="Lihat Detail">
+                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                                </svg>
+                                            </Link>
                                     </div>
                                     <div class="text-xs font-semibold text-gray-500 uppercase mb-2">
                                          PIC: {{ get_pic_names(activity.pic) }}
                                     </div>
-                                    <p class="text-sm text-gray-700 mb-2">{{ activity.description }}</p>
+                                    <p class="text-xs text-gray-700 mb-2 break-words">{{ activity.description }}</p>
                                     <div class="flex items-center text-xs text-gray-500">
                                         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -568,6 +678,59 @@ const changePage = (page) => {
                         Simpan
                     </PrimaryButton>
                 </div>
+                </form>
+            </div>
+        </Modal>
+
+        <!-- Modal Edit Activity -->
+        <Modal :show="showEditActivityModal" @close="closeEditActivityModal">
+            <div class="p-6">
+                <h2 class="text-lg font-medium text-gray-900 mb-4">
+                    Edit Tugas: {{ activityToEdit?.app_request?.title }}
+                </h2>
+
+                <form @submit.prevent="submitEditActivity">
+                    <div class="space-y-4 max-h-[70vh] overflow-y-auto pr-2">
+                        <div>
+                            <label for="edit_description" class="block text-sm font-medium text-gray-700">Deskripsi Aktivitas Utama</label>
+                            <textarea id="edit_description" v-model="editActivityForm.description" class="border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm mt-1 block w-full" required></textarea>
+                            <p v-if="editActivityForm.errors.description" class="text-red-500 text-xs mt-1">{{ editActivityForm.errors.description }}</p>
+                        </div>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label for="edit_start_date" class="block text-sm font-medium text-gray-700">Tanggal Mulai</label>
+                                <input type="datetime-local" id="edit_start_date" v-model="editActivityForm.start_date" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm">
+                            </div>
+                                <div>
+                                <label for="edit_end_date" class="block text-sm font-medium text-gray-700">Tanggal Selesai</label>
+                                <input type="datetime-local" id="edit_end_date" v-model="editActivityForm.end_date" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm">
+                            </div>
+                            <div class="col-span-1 md:col-span-2">
+                                <label class="block text-sm font-medium text-gray-700 mb-1">PIC</label>
+                                <MultiSelect
+                                    v-model="editActivityForm.pic"
+                                    :options="picOptions"
+                                    placeholder="Pilih PIC..."
+                                />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mt-6 flex justify-end space-x-3">
+                        <SecondaryButton @click="closeEditActivityModal">
+                            Batal
+                        </SecondaryButton>
+
+                        <PrimaryButton
+                            class="ml-3"
+                            :class="{ 'opacity-25': editActivityForm.processing }"
+                            :disabled="editActivityForm.processing"
+                            type="submit"
+                        >
+                            Simpan Perubahan
+                        </PrimaryButton>
+                    </div>
                 </form>
             </div>
         </Modal>

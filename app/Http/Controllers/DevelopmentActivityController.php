@@ -34,12 +34,13 @@ class DevelopmentActivityController extends Controller
 
         $validated = $request->validate([
             'description' => 'required|string',
-            'sub_activities' => 'required|array|min:1',
-            'sub_activities.*' => 'required|string|max:255',
+            'sub_activities' => 'nullable|array',
+            'sub_activities.*' => 'nullable|string|max:255',
             'start_date' => 'nullable|date',
             'end_date' => 'nullable|date|after_or_equal:start_date',
             'pic' => 'nullable|array', // Validasi array
-            'pic.*' => 'exists:pics,id', // Validasi setiap item di array
+            // 'pic.*' => 'exists:pics,id', // Hapus atau ganti supaya bisa string bebas (OPD name)
+            'pic.*' => 'string', // Allow string IDs or Names
         ]);
 
         $activity = DB::transaction(function () use ($appRequest, $validated) {
@@ -60,16 +61,25 @@ class DevelopmentActivityController extends Controller
 
             // 2. Buat sub-aktivitas
             $subActivitiesData = [];
-            foreach ($validated['sub_activities'] as $subActivityName) {
-                if (!empty($subActivityName)) { // Pastikan sub-aktivitas kosong tidak ditambahkan
-                    $subActivitiesData[] = ['name' => $subActivityName];
+            $subActivitiesInput = $validated['sub_activities'] ?? [];
+            if (is_array($subActivitiesInput)) {
+                foreach ($subActivitiesInput as $subActivityName) {
+                    if (!empty($subActivityName)) { // Pastikan sub-aktivitas kosong tidak ditambahkan
+                        $subActivitiesData[] = ['name' => $subActivityName];
+                    }
                 }
             }
-            $activity->subActivities()->createMany($subActivitiesData);
+            if (!empty($subActivitiesData)) {
+                $activity->subActivities()->createMany($subActivitiesData);
+            }
 
             // Muat kembali relasi subActivities untuk dikirim sebagai respons
             return $activity->load('subActivities');
         });
+
+        if ($request->boolean('return_to_index')) {
+            return redirect()->back()->with('success', 'Aktivitas pengembangan berhasil ditambahkan.');
+        }
 
         return redirect()->route('app-requests.show', $appRequest)->with('success', 'Aktivitas pengembangan berhasil ditambahkan.');
     }
@@ -83,47 +93,49 @@ class DevelopmentActivityController extends Controller
             abort(403, 'Hanya admin yang dapat melakukan verifikasi.');
         }
 
+        // Unified validation for both Contexts (Axios/JSON and Inertia/Form)
+        $validated = $request->validate([
+            'description' => 'required|string',
+            'start_date' => 'nullable|date',
+            'end_date' => 'nullable|date|after_or_equal:start_date',
+            'pic' => 'nullable|array',
+            'pic.*' => 'string',
+            'is_completed' => 'nullable|boolean', // Optional, mainly for switching status
+        ]);
+
+        // Prepare update data
+        $updateData = [
+            'description' => $validated['description'],
+        ];
+
+        // Handle PIC if present
+        if (array_key_exists('pic', $validated)) {
+            $updateData['pic'] = $validated['pic'] ?? [];
+        }
+
+        // Handle Dates (ensure they can be set to null)
+        if (array_key_exists('start_date', $validated)) {
+            $updateData['start_date'] = !empty($validated['start_date']) ? $validated['start_date'] : null;
+        }
+        if (array_key_exists('end_date', $validated)) {
+            $updateData['end_date'] = !empty($validated['end_date']) ? $validated['end_date'] : null;
+        }
+
+        // Handle Completion Status
+        if (isset($validated['is_completed'])) {
+            $updateData['is_completed'] = $validated['is_completed'];
+        }
+
+        $developmentActivity->update($updateData);
+
         if ($request->wantsJson()) {
-            // Handle AJAX request for updating description and dates
-            $validated = $request->validate([
-                'description' => 'required|string',
-                'start_date' => 'nullable|date',
-                'end_date' => 'nullable|date|after_or_equal:start_date',
-                'pic' => 'nullable|array',
-                'pic.*' => 'exists:pics,id',
-            ]);
-
-            // Prepare update data
-            $updateData = [
-                'description' => $validated['description'],
-                'pic' => $validated['pic'] ?? [],
-            ];
-
-            // Add dates (handle empty string as null)
-            if (isset($validated['start_date'])) {
-                $updateData['start_date'] = !empty($validated['start_date']) ? $validated['start_date'] : null;
-            }
-            if (isset($validated['end_date'])) {
-                $updateData['end_date'] = !empty($validated['end_date']) ? $validated['end_date'] : null;
-            }
-
-            $developmentActivity->update($updateData);
-
             return response()->json([
                 'success' => true,
                 'message' => 'Aktivitas pengembangan berhasil diperbarui.'
             ]);
         }
 
-        // Handle regular form request
-        $validated = $request->validate([
-            'description' => 'required|string',
-            'is_completed' => 'required|boolean',
-        ]);
-
-        $developmentActivity->update($validated);
-
-        return redirect()->route('app-requests.show', $developmentActivity->app_request_id)->with('success', 'Aktivitas pengembangan berhasil diperbarui.');
+        return redirect()->back()->with('success', 'Aktivitas pengembangan berhasil diperbarui.');
     }
 
     /**

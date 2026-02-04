@@ -37,7 +37,10 @@ const filteredOptions = computed(() => {
 });
 
 const selectedOptions = computed(() => {
-    return props.options.filter(option => props.modelValue.includes(option.value));
+    return props.modelValue.map(value => {
+        const option = props.options.find(o => o.value === value);
+        return option || { value: value, label: value };
+    });
 });
 
 const selectOption = (option) => {
