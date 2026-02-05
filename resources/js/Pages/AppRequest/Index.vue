@@ -182,14 +182,23 @@ const getDeadlineColor = (activity) => {
     // If completed, maybe neutral color? The prompt didn't specify, but red for overdue is good.
     if (activity.is_completed) return 'text-green-600'; 
 
-    const deadline = parseISO(activity.end_date);
-    if (isPast(deadline)) return 'text-red-600';
-    
+    const end = parseISO(activity.end_date);
     const now = new Date();
-    const diff = differenceInDays(deadline, now);
-    if (diff <= 7) return 'text-yellow-600';
     
-    return 'text-gray-600';
+    // Check if past (overdue)
+    if (isPast(end) && !isSameDay(end, now)) {
+        return 'text-red-600 font-bold';
+    }
+
+    const daysLeft = differenceInDays(end, now);
+
+    if (daysLeft <= 1) { // Today or Tomorrow
+         return 'text-red-600 font-bold'; // Urgent
+    } else if (daysLeft <= 3) {
+         return 'text-yellow-600 font-semibold'; // Warning
+    } else {
+         return 'text-green-600'; // Safe
+    }
 };
 
 </script>
